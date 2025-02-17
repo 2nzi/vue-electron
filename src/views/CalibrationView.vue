@@ -42,8 +42,13 @@
           <div class="video-frame-container">
             <div class="video-frame" 
                  ref="imageContainer"
-                 :style="frameStyle">
-              <div class="image-container">
+                 :style="frameStyle"
+                 @wheel.prevent="handleZoom"
+                 @mousedown="startPan"
+                 @mousemove="handleMouseMove"
+                 @mouseup="stopPan"
+                 @mouseleave="stopPan">
+              <div class="image-container" :style="transformStyle">
                 <img v-if="thumbnail" 
                      :src="thumbnail" 
                      alt="Video frame"
@@ -88,7 +93,11 @@ export default {
       thumbnail: null,
       showSidebar: true,
       aspectRatio: 1,
-      imageSize: { width: 0, height: 0 }
+      imageSize: { width: 0, height: 0 },
+      scale: 1,
+      isPanning: false,
+      panStart: { x: 0, y: 0 },
+      translation: { x: 0, y: 0 }
     }
   },
   computed: {
@@ -115,6 +124,12 @@ export default {
         width: `${width}px`,
         height: `${height}px`
       };
+    },
+    transformStyle() {
+      return {
+        transform: `translate(${this.translation.x}px, ${this.translation.y}px) scale(${this.scale})`,
+        transformOrigin: '0 0'
+      }
     }
   },
   async created() {
@@ -160,6 +175,74 @@ export default {
       };
       
       this.aspectRatio = this.imageSize.width / this.imageSize.height;
+    },
+    handleZoom(event) {
+      const zoomFactor = 0.1;
+      const delta = Math.sign(event.deltaY) * -1;
+      const newScale = this.scale + delta * zoomFactor;
+      
+      // Limiter le zoom entre 1x et 5x
+      const oldScale = this.scale;
+      this.scale = Math.min(Math.max(newScale, 1), 15);
+      
+      if (this.scale !== oldScale) {
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Point dans l'image originale que nous voulons garder sous la souris
+        const pointX = (mouseX - this.translation.x) / oldScale;
+        const pointY = (mouseY - this.translation.y) / oldScale;
+
+        // Calculer la nouvelle translation pour maintenir le point sous la souris
+        this.translation = {
+          x: mouseX - (pointX * this.scale),
+          y: mouseY - (pointY * this.scale)
+        };
+
+        // Logs pour debug
+        console.log('--- Zoom Debug ---');
+        console.log('Scale:', this.scale);
+        console.log('Mouse position:', { mouseX, mouseY });
+        console.log('Point in image:', { pointX, pointY });
+        console.log('New translation:', this.translation);
+      }
+    },
+    startPan(event) {
+      if (this.scale > 1) {
+        this.isPanning = true;
+        this.panStart = {
+          x: event.clientX - this.translation.x,
+          y: event.clientY - this.translation.y
+        };
+      }
+    },
+    handleMouseMove(event) {
+      if (this.isPanning) {
+        this.pan(event);
+      }
+
+      const rect = this.$refs.imageContainer.getBoundingClientRect();
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      // Calculer les coordonnées dans l'image originale
+      const pointX = (mouseX - this.translation.x) / this.scale;
+      const pointY = (mouseY - this.translation.y) / this.scale;
+
+      console.log('--- Mouse Position ---');
+      console.log('Point in original image:', { pointX, pointY });
+    },
+    pan(event) {
+      if (!this.isPanning) return;
+      
+      this.translation = {
+        x: event.clientX - this.panStart.x,
+        y: event.clientY - this.panStart.y
+      };
+    },
+    stopPan() {
+      this.isPanning = false;
     }
   }
 }
@@ -277,6 +360,7 @@ export default {
   position: relative;
   background-color: #2a2a2a;
   overflow: hidden;
+  cursor: move;
 }
 
 .image-container {
@@ -284,6 +368,8 @@ export default {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  transition: transform 0.1s ease;
+  will-change: transform;
 }
 
 .video-image {
