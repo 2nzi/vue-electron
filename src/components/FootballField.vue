@@ -69,7 +69,10 @@ export default {
       });
     },
     getPointColor(index) {
-      if (this.selectedPointIndex === index) return 'red';
+      if (this.selectedPointIndex === index) {
+        if (index in this.positionedPoints) return '#FFFF00';
+        return 'red';
+      }
       if (index in this.positionedPoints) return '#00FF15';
       return 'white';
     }

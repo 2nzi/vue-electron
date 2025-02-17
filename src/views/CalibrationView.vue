@@ -50,6 +50,7 @@
                 <div v-for="(point, index) in calibrationPoints" 
                      :key="index"
                      class="calibration-point"
+                     :class="{ 'selected-point': selectedFieldPoint && Number(selectedFieldPoint.index) === Number(index) }"
                      :style="{
                        left: `${point.x}px`,
                        top: `${point.y}px`
@@ -217,6 +218,9 @@ export default {
       }
     },
     handleFieldPointSelected(pointData) {
+      console.log('Point sélectionné:', pointData.index);
+      console.log('Points calibrés:', this.calibrationPoints);
+      console.log('Point existe dans calibrationPoints:', pointData.index in this.calibrationPoints);
       this.selectedFieldPoint = pointData;
     },
     handleMouseDown(event) {
@@ -225,19 +229,19 @@ export default {
         this.isMiddleMouseDown = true;
         this.lastMousePosition = { x: event.clientX, y: event.clientY };
       } else if (event.button === 0 && this.selectedFieldPoint) {
-        // Ajouter un point uniquement si un point du terrain est sélectionné
         const rect = this.$refs.imageContainer.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
         const pointX = (mouseX - this.translation.x) / this.scale;
         const pointY = (mouseY - this.translation.y) / this.scale;
         
-        // Associer le point à l'index du point du terrain
-        this.calibrationPoints[this.selectedFieldPoint.index] = { x: pointX, y: pointY };
+        // S'assurer que l'index est traité comme un nombre
+        const index = Number(this.selectedFieldPoint.index);
+        this.calibrationPoints[index] = { x: pointX, y: pointY };
         
-        // Optionnel : désélectionner le point après l'avoir placé
-        this.selectedFieldPoint = null;
-        this.$refs.footballField.selectedPointIndex = null;
+        // Ne pas désélectionner le point après l'avoir placé
+        // this.selectedFieldPoint = null;
+        // this.$refs.footballField.selectedPointIndex = null;
       }
     },
     handleMouseMove(event) {
@@ -419,6 +423,31 @@ export default {
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+.selected-point {
+  background-color: yellow;
+  width: 6px;
+  height: 6px;
+  box-shadow: 0 0 12px yellow, 0 0 20px yellow;
+  animation: pulse 1s infinite;
+  z-index: 100;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0.7;
+    box-shadow: 0 0 25px yellow, 0 0 40px yellow;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 1;
+  }
 }
 
 .field-container {
