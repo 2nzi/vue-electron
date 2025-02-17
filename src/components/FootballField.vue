@@ -26,8 +26,9 @@
           :cx="point[0]" 
           :cy="point[1]" 
           r="1.5" 
-          fill="white"
+          :fill="getPointColor(index)"
           class="keypoint"
+          @click="selectPoint(index)"
         />
       </template>
     </g>
@@ -37,8 +38,15 @@
 <script>
 export default {
   name: 'FootballField',
+  props: {
+    positionedPoints: {
+      type: Object,
+      default: () => ({})
+    }
+  },
   data() {
     return {
+      selectedPointIndex: null,
       keypoints: [
         [0., 0.], [52.5, 0.], [105., 0.], [0., 13.84], [16.5, 13.84], [88.5, 13.84], [105., 13.84],
         [0., 24.84], [5.5, 24.84], [99.5, 24.84], [105., 24.84], [0., 30.34], [0., 30.34],
@@ -50,6 +58,20 @@ export default {
         [43.35, 34.], [52.5, 34.], [61.5, 34.], [84.85, 34.],
         [88.5, 34.], [94., 34.]
       ]
+    }
+  },
+  methods: {
+    selectPoint(index) {
+      this.selectedPointIndex = index;
+      this.$emit('point-selected', {
+        index,
+        coordinates: this.keypoints[index]
+      });
+    },
+    getPointColor(index) {
+      if (this.selectedPointIndex === index) return 'red';
+      if (index in this.positionedPoints) return '#00FF15';
+      return 'white';
     }
   }
 }
@@ -65,5 +87,10 @@ export default {
 
 .keypoint {
   filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); /* Effet de brillance pour les points */
+  cursor: pointer;
+}
+
+.keypoint:hover {
+  filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.8));
 }
 </style>

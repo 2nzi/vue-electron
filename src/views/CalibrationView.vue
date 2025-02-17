@@ -59,7 +59,11 @@
             </div>
           </div>
           <div class="field-container">
-            <FootballField />
+            <FootballField 
+              ref="footballField"
+              @point-selected="handleFieldPointSelected"
+              :positionedPoints="calibrationPoints"
+            />
           </div>
         </div>
 
@@ -97,9 +101,10 @@ export default {
       isPanning: false,
       panStart: { x: 0, y: 0 },
       translation: { x: 0, y: 0 },
-      calibrationPoints: [],
+      calibrationPoints: {},
       isMiddleMouseDown: false,
-      lastMousePosition: { x: 0, y: 0 }
+      lastMousePosition: { x: 0, y: 0 },
+      selectedFieldPoint: null
     }
   },
   computed: {
@@ -144,7 +149,8 @@ export default {
       try {
         this.videos = await window.electron.getVideosFromFolder(this.folderPath)
         if (this.videos.length > 0) {
-          await this.selectVideo(this.videos[0])
+          await this.selectVideo(this.videos[3])
+          // await this.selectVideo(this.videos[0])
         }
       } catch (error) {
         console.error('Erreur lors du chargement des vidéos:', error)
@@ -208,28 +214,30 @@ export default {
           y: mouseY - (pointY * this.scale)
         };
 
-        // Logs pour debug
-        console.log('--- Zoom Debug ---');
-        console.log('Scale:', this.scale);
-        console.log('Mouse position:', { mouseX, mouseY });
-        console.log('Point in image:', { pointX, pointY });
-        console.log('New translation:', this.translation);
       }
     },
+    handleFieldPointSelected(pointData) {
+      this.selectedFieldPoint = pointData;
+    },
     handleMouseDown(event) {
-      // Molette de souris (button 1)
       if (event.button === 1) {
         event.preventDefault();
         this.isMiddleMouseDown = true;
         this.lastMousePosition = { x: event.clientX, y: event.clientY };
-      } else if (event.button === 0) {
-        // Clic gauche - ajout de point
+      } else if (event.button === 0 && this.selectedFieldPoint) {
+        // Ajouter un point uniquement si un point du terrain est sélectionné
         const rect = this.$refs.imageContainer.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
         const pointX = (mouseX - this.translation.x) / this.scale;
         const pointY = (mouseY - this.translation.y) / this.scale;
-        this.calibrationPoints.push({ x: pointX, y: pointY });
+        
+        // Associer le point à l'index du point du terrain
+        this.calibrationPoints[this.selectedFieldPoint.index] = { x: pointX, y: pointY };
+        
+        // Optionnel : désélectionner le point après l'avoir placé
+        this.selectedFieldPoint = null;
+        this.$refs.footballField.selectedPointIndex = null;
       }
     },
     handleMouseMove(event) {
