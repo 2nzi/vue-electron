@@ -183,7 +183,13 @@ export default {
       
       // Limiter le zoom entre 1x et 5x
       const oldScale = this.scale;
-      this.scale = Math.min(Math.max(newScale, 1), 15);
+      this.scale = Math.min(Math.max(newScale, 1), 5);
+      
+      // Si on revient à l'échelle 1, on réinitialise la translation
+      if (this.scale === 1) {
+        this.translation = { x: 0, y: 0 };
+        return;
+      }
       
       if (this.scale !== oldScale) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
