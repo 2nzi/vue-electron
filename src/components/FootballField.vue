@@ -1,27 +1,36 @@
 <template>
-  <svg class="football-field" viewBox="0 0 105 68" preserveAspectRatio="xMidYMid meet">
-    <!-- Terrain complet -->
-    <rect x="0" y="0" width="105" height="68" fill="none" stroke="white" stroke-width="0.2"/>
-    
-    <!-- Ligne médiane -->
-    <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="white" stroke-width="0.2"/>
-    <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="white" stroke-width="0.2"/>
-    <circle cx="52.5" cy="34" r="0.3" fill="white"/>
-    
-    <!-- Surface de réparation gauche -->
-    <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" stroke-width="0.2"/>
-    <rect x="0" y="24.84" width="5.5" height="18.32" fill="none" stroke="white" stroke-width="0.2"/>
-    <circle cx="11" cy="34" r="0.3" fill="white"/>
-    
-    <!-- Surface de réparation droite -->
-    <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="white" stroke-width="0.2"/>
-    <rect x="99.5" y="24.84" width="5.5" height="18.32" fill="none" stroke="white" stroke-width="0.2"/>
-    <circle cx="94" cy="34" r="0.3" fill="white"/>
-    
-    <!-- Points clés -->
-    <template v-for="(point, index) in keypoints" :key="index">
-      <circle :cx="point[0]" :cy="point[1]" r="0.3" fill="white"/>
-    </template>
+  <svg class="football-field" viewBox="0 0 68 105" preserveAspectRatio="xMidYMid meet">
+    <!-- On utilise une transformation pour pivoter tout le terrain -->
+    <g transform="translate(68, 0) rotate(90)">
+      <!-- Terrain complet -->
+      <rect x="0" y="0" width="105" height="68" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      
+      <!-- Ligne médiane -->
+      <line x1="52.5" y1="0" x2="52.5" y2="68" stroke="#00FF15" stroke-width="0.3"/>
+      <circle cx="52.5" cy="34" r="9.15" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      <circle cx="52.5" cy="34" r="0.5" fill="white"/>
+      
+      <!-- Surface de réparation gauche -->
+      <rect x="0" y="13.84" width="16.5" height="40.32" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      <rect x="0" y="24.84" width="5.5" height="18.32" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      <circle cx="11" cy="34" r="0.5" fill="white"/>
+      
+      <!-- Surface de réparation droite -->
+      <rect x="88.5" y="13.84" width="16.5" height="40.32" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      <rect x="99.5" y="24.84" width="5.5" height="18.32" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+      <circle cx="94" cy="34" r="0.5" fill="white"/>
+      
+      <!-- Points clés -->
+      <template v-for="(point, index) in keypoints" :key="index">
+        <circle 
+          :cx="point[0]" 
+          :cy="point[1]" 
+          r="1.5" 
+          fill="white"
+          class="keypoint"
+        />
+      </template>
+    </g>
   </svg>
 </template>
 
@@ -51,5 +60,10 @@ export default {
   width: 100%;
   height: 100%;
   position: relative;
+  background-color: #1a1a1a; /* Fond sombre pour mieux voir les lignes vertes */
+}
+
+.keypoint {
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); /* Effet de brillance pour les points */
 }
 </style>
