@@ -38,4 +38,12 @@ contextBridge.exposeInMainWorld('electron', {
       throw error;
     }
   },
+  saveCalibration: async (data) => {
+    try {
+      return await ipcRenderer.invoke('calibration:save', data)
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de la calibration:', error)
+      throw error
+    }
+  }
 }) 

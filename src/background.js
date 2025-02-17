@@ -6,6 +6,7 @@ import installExtension, { VUEJS3_DEVTOOLS } from 'electron-devtools-installer'
 import * as remote from '@electron/remote/main'
 import path from 'path'
 import fs from 'fs'
+const yaml = require('js-yaml')
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
@@ -120,4 +121,24 @@ ipcMain.handle('video:getThumbnail', async (_, videoPath) => {
   }
   // Retourner null temporairement au lieu de générer une miniature
   return null
+})
+
+ipcMain.handle('calibration:save', async (_, data) => {
+  try {
+    const { folderPath, filePath, data: calibrationData } = data
+    
+    // Créer le dossier s'il n'existe pas
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true })
+    }
+
+    // Sauvegarder les données en YAML
+    const yamlStr = yaml.dump(calibrationData)
+    fs.writeFileSync(filePath, yamlStr, 'utf8')
+
+    return { success: true }
+  } catch (error) {
+    console.error('Erreur lors de la sauvegarde:', error)
+    throw error
+  }
 })

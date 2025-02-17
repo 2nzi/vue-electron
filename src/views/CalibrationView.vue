@@ -25,9 +25,15 @@
           <h4>METADATA</h4>
           <div class="metadata-info">
             <p>nom: {{ selectedVideo.name }}</p>
-            <p>session: nom_de_la_session</p>
+            <p>session: {{ selectedVideo.session || 'nom_de_la_session' }}</p>
             <p>création: {{ new Date().toLocaleDateString() }}</p>
           </div>
+          <button 
+            class="save-btn" 
+            @click="saveCalibration"
+            :disabled="Object.keys(calibrationPoints).length === 0">
+            Sauvegarder la calibration
+          </button>
         </div>
 
         <div class="video-display">
@@ -275,6 +281,78 @@ export default {
     },
     stopPan() {
       this.isMiddleMouseDown = false;
+    },
+    async saveCalibration() {
+      if (!this.selectedVideo) return;
+
+      // Récupérer les keypoints depuis le FootballField
+      const fieldKeypoints = this.$refs.footballField.keypoints;
+
+      // Préparation des données de calibration
+      const calibrationData = {
+        metadata: {
+          video_name: this.selectedVideo.name,
+          video_path: this.selectedVideo.path,
+          calibration_date: new Date().toISOString(),
+          total_keypoints: fieldKeypoints.length,
+          positioned_keypoints: Object.keys(this.calibrationPoints).length,
+          image_size: this.imageSize
+        },
+        keypoints: {},
+        field_dimensions: {
+          width: 105,
+          height: 68
+        }
+      };
+
+      // Conversion des points en format plus lisible
+      for (const [index, point] of Object.entries(this.calibrationPoints)) {
+        calibrationData.keypoints[index] = {
+          image_coordinates: {
+            x: Math.round(point.x * 100) / 100,
+            y: Math.round(point.y * 100) / 100
+          },
+          field_coordinates: {
+            x: Math.round(fieldKeypoints[index][0] * 100) / 100,
+            y: Math.round(fieldKeypoints[index][1] * 100) / 100
+          }
+        };
+      }
+
+      const requestData = {
+        video_path: this.selectedVideo.path,
+        calibration_data: calibrationData
+      };
+
+      console.log('Données envoyées:', requestData); // Pour déboguer
+
+      try {
+        // Appel à l'API Python
+        const response = await fetch('http://localhost:8000/calibration/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Erreur détaillée:', errorData); // Pour déboguer
+          throw new Error(errorData.detail || 'Erreur lors de la sauvegarde');
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Calibration sauvegardée avec succès !');
+        } else {
+          throw new Error(result.message || 'Erreur lors de la sauvegarde');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        alert('Erreur lors de la sauvegarde de la calibration');
+      }
     }
   }
 }
@@ -427,9 +505,9 @@ export default {
 
 .selected-point {
   background-color: yellow;
-  width: 6px;
-  height: 6px;
-  box-shadow: 0 0 12px yellow, 0 0 20px yellow;
+  width: 3px;
+  height: 3px;
+  box-shadow: 0 0 8px yellow, 0 0 14px yellow;
   animation: pulse 1s infinite;
   z-index: 100;
 }
@@ -440,7 +518,7 @@ export default {
     opacity: 1;
   }
   50% {
-    transform: translate(-50%, -50%) scale(1.5);
+    transform: translate(-50%, -50%) scale(1.2);
     opacity: 0.7;
     box-shadow: 0 0 25px yellow, 0 0 40px yellow;
   }
@@ -481,5 +559,25 @@ export default {
   padding: 1rem;
   background-color: #2a2a2a;
   border-radius: 4px;
+}
+
+.save-btn {
+  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.save-btn:hover {
+  background-color: #45a049;
+}
+
+.save-btn:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 </style> 
