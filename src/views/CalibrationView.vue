@@ -1,13 +1,5 @@
 <template>
   <div class="calibration">
-    <!-- <div class="top-bar">
-      <div class="menu-buttons">
-        <button class="menu-btn">File</button>
-        <button class="menu-btn">Edit</button>
-        <button class="menu-btn">Help</button>
-      </div>
-    </div> -->
-
     <div class="main-content">
       <!-- Sidebar avec toggle -->
       <div class="sidebar" :class="{ 'sidebar-hidden': !showSidebar }">
@@ -44,7 +36,7 @@
                  ref="imageContainer"
                  :style="frameStyle"
                  @wheel.prevent="handleZoom"
-                 @mousedown="startPan"
+                 @mousedown="handleMouseDown"
                  @mousemove="handleMouseMove"
                  @mouseup="stopPan"
                  @mouseleave="stopPan">
@@ -55,7 +47,14 @@
                      @load="initializeImage"
                      ref="image"
                      class="video-image" />
-                <div v-else class="loading">Chargement de la frame...</div>
+                <div v-for="(point, index) in calibrationPoints" 
+                     :key="index"
+                     class="calibration-point"
+                     :style="{
+                       left: `${point.x}px`,
+                       top: `${point.y}px`
+                     }">
+                </div>
               </div>
             </div>
           </div>
@@ -97,7 +96,10 @@ export default {
       scale: 1,
       isPanning: false,
       panStart: { x: 0, y: 0 },
-      translation: { x: 0, y: 0 }
+      translation: { x: 0, y: 0 },
+      calibrationPoints: [],
+      isMiddleMouseDown: false,
+      lastMousePosition: { x: 0, y: 0 }
     }
   },
   computed: {
@@ -183,7 +185,7 @@ export default {
       
       // Limiter le zoom entre 1x et 5x
       const oldScale = this.scale;
-      this.scale = Math.min(Math.max(newScale, 1), 5);
+      this.scale = Math.min(Math.max(newScale, 1), 15);
       
       // Si on revient à l'échelle 1, on réinitialise la translation
       if (this.scale === 1) {
@@ -214,41 +216,53 @@ export default {
         console.log('New translation:', this.translation);
       }
     },
-    startPan(event) {
-      if (this.scale > 1) {
-        this.isPanning = true;
-        this.panStart = {
-          x: event.clientX - this.translation.x,
-          y: event.clientY - this.translation.y
-        };
+    handleMouseDown(event) {
+      // Molette de souris (button 1)
+      if (event.button === 1) {
+        event.preventDefault();
+        this.isMiddleMouseDown = true;
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+      } else if (event.button === 0) {
+        // Clic gauche - ajout de point
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        const pointX = (mouseX - this.translation.x) / this.scale;
+        const pointY = (mouseY - this.translation.y) / this.scale;
+        this.calibrationPoints.push({ x: pointX, y: pointY });
       }
     },
     handleMouseMove(event) {
-      if (this.isPanning) {
-        this.pan(event);
+      if (this.isMiddleMouseDown) {
+        const deltaX = event.clientX - this.lastMousePosition.x;
+        const deltaY = event.clientY - this.lastMousePosition.y;
+        
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+        
+        // Calculer les limites de translation
+        const scaledImageWidth = this.imageSize.width * this.scale;
+        const scaledImageHeight = this.imageSize.height * this.scale;
+        
+        const minX = containerWidth - scaledImageWidth;
+        const minY = containerHeight - scaledImageHeight;
+        
+        // Appliquer la translation avec les limites
+        const newX = Math.min(0, Math.max(minX, this.translation.x + deltaX));
+        const newY = Math.min(0, Math.max(minY, this.translation.y + deltaY));
+        
+        this.translation = { x: newX, y: newY };
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
       }
-
-      const rect = this.$refs.imageContainer.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-
-      // Calculer les coordonnées dans l'image originale
-      const pointX = (mouseX - this.translation.x) / this.scale;
-      const pointY = (mouseY - this.translation.y) / this.scale;
-
-      console.log('--- Mouse Position ---');
-      console.log('Point in original image:', { pointX, pointY });
     },
-    pan(event) {
-      if (!this.isPanning) return;
-      
-      this.translation = {
-        x: event.clientX - this.panStart.x,
-        y: event.clientY - this.panStart.y
-      };
+    handleMouseUp(event) {
+      if (event.button === 1) {
+        this.isMiddleMouseDown = false;
+      }
     },
     stopPan() {
-      this.isPanning = false;
+      this.isMiddleMouseDown = false;
     }
   }
 }
@@ -366,7 +380,11 @@ export default {
   position: relative;
   background-color: #2a2a2a;
   overflow: hidden;
-  cursor: move;
+  cursor: default;
+}
+
+.video-frame:active {
+  cursor: grab;
 }
 
 .image-container {
@@ -387,8 +405,8 @@ export default {
 
 .calibration-point {
   position: absolute;
-  width: 10px;
-  height: 10px;
+  width: 3px;
+  height: 3px;
   background-color: red;
   border-radius: 50%;
   transform: translate(-50%, -50%);
