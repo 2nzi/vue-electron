@@ -39,9 +39,26 @@
         </div>
 
         <div class="video-display">
-          <div class="video-frame">
-            <img v-if="thumbnail" :src="thumbnail" alt="Video frame" />
-            <div v-else class="loading">Chargement de la frame...</div>
+          <div class="video-frame" 
+               @wheel="handleZoom"
+               @click="handleImageClick"
+               ref="imageContainer">
+            <div class="image-wrapper" :style="imageTransformStyle">
+              <img v-if="thumbnail" 
+                   :src="thumbnail" 
+                   alt="Video frame"
+                   @load="initializeImage"
+                   ref="image"
+                   class="video-image" />
+              <div v-else class="loading">Chargement de la frame...</div>
+              
+              <!-- Points de calibration -->
+              <div v-for="(point, index) in calibrationPoints" 
+                   :key="index" 
+                   class="calibration-point"
+                   :style="{ left: `${point.x}px`, top: `${point.y}px` }">
+              </div>
+            </div>
           </div>
           <div class="field-container">
             <FootballField />
@@ -75,7 +92,19 @@ export default {
       videos: [],
       selectedVideo: null,
       thumbnail: null,
-      showSidebar: true
+      showSidebar: true,
+      scale: 1,
+      minScale: 1,
+      calibrationPoints: [],
+      imageSize: { width: 0, height: 0 }
+    }
+  },
+  computed: {
+    imageTransformStyle() {
+      return {
+        transform: `scale(${this.scale})`,
+        transformOrigin: 'center center'
+      }
     }
   },
   async created() {
@@ -112,6 +141,43 @@ export default {
     },
     toggleSidebar() {
       this.showSidebar = !this.showSidebar
+    },
+    handleZoom(event) {
+      if (event.ctrlKey) {
+        event.preventDefault()
+        const delta = event.deltaY > 0 ? -0.1 : 0.1
+        // Ne jamais descendre en dessous du minScale qui assure la largeur minimale
+        this.scale = Math.max(this.minScale, Math.min(3, this.scale + delta))
+      }
+    },
+    
+    handleImageClick(event) {
+      const rect = event.target.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      
+      this.calibrationPoints.push({
+        x: x / this.scale,
+        y: y / this.scale
+      })
+    },
+    
+    initializeImage(event) {
+      this.imageSize = {
+        width: event.target.naturalWidth,
+        height: event.target.naturalHeight
+      }
+      
+      const container = this.$refs.imageContainer
+      if (container) {
+        const containerWidth = container.clientWidth
+        
+        // S'assurer que l'image occupe au moins toute la largeur
+        this.minScale = Math.max(1, containerWidth / this.imageSize.width)
+        
+        // Initialise l'échelle au minimum
+        this.scale = this.minScale
+      }
     }
   }
 }
@@ -214,26 +280,47 @@ export default {
   flex: 1;
   display: flex;
   gap: 1rem;
-  align-items: center;
+  align-items: stretch;
 }
 
 .video-frame {
   flex: 2;
-  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
+  position: relative;
+  background-color: #2a2a2a;
 }
 
-.video-frame img {
-  max-width: 100%;
-  max-height: 100%;
+.image-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  transition: transform 0.1s ease-out;
+}
+
+.video-image {
+  width: 100%;
   object-fit: contain;
+  display: block;
+}
+
+.calibration-point {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .field-container {
   flex: 1;
-  height: 100%;
+  background-color: #2a2a2a;
   border-radius: 4px;
   padding: 1rem;
   display: flex;
