@@ -39,24 +39,18 @@
         </div>
 
         <div class="video-display">
-          <div class="video-frame" 
-               @wheel="handleZoom"
-               @click="handleImageClick"
-               ref="imageContainer">
-            <div class="image-wrapper" :style="imageTransformStyle">
-              <img v-if="thumbnail" 
-                   :src="thumbnail" 
-                   alt="Video frame"
-                   @load="initializeImage"
-                   ref="image"
-                   class="video-image" />
-              <div v-else class="loading">Chargement de la frame...</div>
-              
-              <!-- Points de calibration -->
-              <div v-for="(point, index) in calibrationPoints" 
-                   :key="index" 
-                   class="calibration-point"
-                   :style="{ left: `${point.x}px`, top: `${point.y}px` }">
+          <div class="video-frame-container">
+            <div class="video-frame" 
+                 ref="imageContainer"
+                 :style="frameStyle">
+              <div class="image-container">
+                <img v-if="thumbnail" 
+                     :src="thumbnail" 
+                     alt="Video frame"
+                     @load="initializeImage"
+                     ref="image"
+                     class="video-image" />
+                <div v-else class="loading">Chargement de la frame...</div>
               </div>
             </div>
           </div>
@@ -93,18 +87,34 @@ export default {
       selectedVideo: null,
       thumbnail: null,
       showSidebar: true,
-      scale: 1,
-      minScale: 1,
-      calibrationPoints: [],
+      aspectRatio: 1,
       imageSize: { width: 0, height: 0 }
     }
   },
   computed: {
-    imageTransformStyle() {
-      return {
-        transform: `scale(${this.scale})`,
-        transformOrigin: 'center center'
+    frameStyle() {
+      if (!this.aspectRatio) return {};
+      
+      const container = this.$refs.imageContainer?.parentElement;
+      if (!container) return {};
+      
+      const parentWidth = container.clientWidth;
+      const parentHeight = container.clientHeight;
+      
+      let width, height;
+      
+      if (parentWidth / parentHeight > this.aspectRatio) {
+        height = parentHeight;
+        width = height * this.aspectRatio;
+      } else {
+        width = parentWidth;
+        height = width / this.aspectRatio;
       }
+      
+      return {
+        width: `${width}px`,
+        height: `${height}px`
+      };
     }
   },
   async created() {
@@ -132,52 +142,24 @@ export default {
           throw new Error('Erreur lors de la récupération de la frame');
         }
         const data = await response.json();
-        this.thumbnail = data.data; // L'image en base64 qui sera affichée
+        this.thumbnail = data.data;
       } catch (error) {
         console.error('Erreur lors du chargement de la première frame:', error);
-        // Optionnel : ajouter un état d'erreur dans l'interface
         this.thumbnail = null;
       }
     },
     toggleSidebar() {
       this.showSidebar = !this.showSidebar
     },
-    handleZoom(event) {
-      if (event.ctrlKey) {
-        event.preventDefault()
-        const delta = event.deltaY > 0 ? -0.1 : 0.1
-        // Ne jamais descendre en dessous du minScale qui assure la largeur minimale
-        this.scale = Math.max(this.minScale, Math.min(3, this.scale + delta))
-      }
-    },
-    
-    handleImageClick(event) {
-      const rect = event.target.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
-      
-      this.calibrationPoints.push({
-        x: x / this.scale,
-        y: y / this.scale
-      })
-    },
-    
     initializeImage(event) {
-      this.imageSize = {
-        width: event.target.naturalWidth,
-        height: event.target.naturalHeight
-      }
+      const image = event.target;
       
-      const container = this.$refs.imageContainer
-      if (container) {
-        const containerWidth = container.clientWidth
-        
-        // S'assurer que l'image occupe au moins toute la largeur
-        this.minScale = Math.max(1, containerWidth / this.imageSize.width)
-        
-        // Initialise l'échelle au minimum
-        this.scale = this.minScale
-      }
+      this.imageSize = {
+        width: image.naturalWidth,
+        height: image.naturalHeight
+      };
+      
+      this.aspectRatio = this.imageSize.width / this.imageSize.height;
     }
   }
 }
@@ -283,29 +265,32 @@ export default {
   align-items: stretch;
 }
 
-.video-frame {
+.video-frame-container {
   flex: 2;
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
-  position: relative;
-  background-color: #2a2a2a;
 }
 
-.image-wrapper {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
+.video-frame {
   position: relative;
-  transition: transform 0.1s ease-out;
+  background-color: #2a2a2a;
+  overflow: hidden;
+}
+
+.image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
 }
 
 .video-image {
-  width: 100%;
-  object-fit: contain;
   display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
 }
 
 .calibration-point {
@@ -320,7 +305,6 @@ export default {
 
 .field-container {
   flex: 1;
-  background-color: #2a2a2a;
   border-radius: 4px;
   padding: 1rem;
   display: flex;
