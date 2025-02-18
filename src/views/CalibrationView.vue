@@ -111,7 +111,9 @@ export default {
       calibrationPoints: {},
       isMiddleMouseDown: false,
       lastMousePosition: { x: 0, y: 0 },
-      selectedFieldPoint: null
+      selectedFieldPoint: null,
+      panPosition: { x: 0, y: 0 },
+      panSpeed: 10, // Vitesse de déplacement avec les touches (en pixels)
     }
   },
   computed: {
@@ -149,6 +151,23 @@ export default {
   async created() {
     if (this.folderPath) {
       await this.loadVideos()
+    }
+  },
+  mounted() {
+    // Ajouter les écouteurs d'événements pour le clavier
+    window.addEventListener('keydown', this.handleKeyDown);
+    
+    // Ajouter l'écouteur pour la molette
+    if (this.$refs.imageContainer) {
+      this.$refs.imageContainer.addEventListener('wheel', this.handleWheel, { passive: false });
+    }
+  },
+  beforeUnmount() {
+    // Nettoyer les écouteurs d'événements
+    window.removeEventListener('keydown', this.handleKeyDown);
+    
+    if (this.$refs.imageContainer) {
+      this.$refs.imageContainer.removeEventListener('wheel', this.handleWheel);
     }
   },
   methods: {
@@ -245,9 +264,9 @@ export default {
         const index = Number(this.selectedFieldPoint.index);
         this.calibrationPoints[index] = { x: pointX, y: pointY };
         
-        // Ne pas désélectionner le point après l'avoir placé
-        // this.selectedFieldPoint = null;
-        // this.$refs.footballField.selectedPointIndex = null;
+        // Désélectionner le point après l'avoir positionné
+        this.selectedFieldPoint = null;
+        this.$refs.footballField.selectedPointIndex = null;
       }
     },
     handleMouseMove(event) {
@@ -353,6 +372,56 @@ export default {
         console.error('Erreur lors de la sauvegarde:', error);
         alert('Erreur lors de la sauvegarde de la calibration');
       }
+    },
+    handleKeyDown(event) {
+      // Empêcher le défilement par défaut de la page
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        event.preventDefault();
+        
+        switch(event.key) {
+          case 'ArrowUp':
+            this.panPosition.y += this.panSpeed;
+            break;
+          case 'ArrowDown':
+            this.panPosition.y -= this.panSpeed;
+            break;
+          case 'ArrowLeft':
+            this.panPosition.x += this.panSpeed;
+            break;
+          case 'ArrowRight':
+            this.panPosition.x -= this.panSpeed;
+            break;
+        }
+      }
+
+      // Si la touche Delete est pressée et qu'un point est sélectionné
+      if (event.key === 'Delete' && this.selectedFieldPoint) {
+        // Supprimer le point des points calibrés
+        if (this.selectedFieldPoint.index in this.calibrationPoints) {
+          delete this.calibrationPoints[this.selectedFieldPoint.index];
+          // Désélectionner le point
+          this.selectedFieldPoint = null;
+          this.$refs.footballField.selectedPointIndex = null;
+        }
+      }
+    },
+    handleWheel(event) {
+      event.preventDefault();
+      
+      // Si la touche Ctrl est enfoncée, on gère le zoom
+      if (event.ctrlKey) {
+        // Gérer le zoom si vous avez cette fonctionnalité
+        return;
+      }
+      
+      // Sinon, on gère le pan (translation)
+      if (event.shiftKey) {
+        // Si Shift est enfoncé, on déplace horizontalement
+        this.panPosition.x -= event.deltaY;
+      } else {
+        // Déplacement vertical par défaut
+        this.panPosition.y -= event.deltaY;
+      }
     }
   }
 }
@@ -456,6 +525,7 @@ export default {
   display: flex;
   gap: 1rem;
   align-items: stretch;
+  min-height: 0;
 }
 
 .video-frame-container {
@@ -464,6 +534,7 @@ export default {
   display: flex;
   justify-content: center;
   align-items: center;
+  min-height: 0;
 }
 
 .video-frame {
@@ -530,10 +601,20 @@ export default {
 
 .field-container {
   flex: 1;
+  min-width: 300px;
+  max-width: 400px;
   border-radius: 4px;
   padding: 1rem;
   display: flex;
   align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.field-container :deep(svg) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .shortkeys-section {
@@ -579,5 +660,19 @@ export default {
 .save-btn:disabled {
   background-color: #cccccc;
   cursor: not-allowed;
+}
+
+.image-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.image-container img {
+  max-width: none;
+  max-height: none;
+  position: relative;
+  transition: transform 0.05s ease-out;
 }
 </style> 
