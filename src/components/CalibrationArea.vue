@@ -253,8 +253,13 @@ export default {
       this.$emit('update:selectedFieldPoint', pointData);
     },
     handleMouseDown(event) {
+      if (event.button === 1) { // Clic molette
+        this.isMiddleMouseDown = true;
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+        return;
+      }
+
       const rect = this.$refs.imageContainer.getBoundingClientRect();
-      // Calculer les coordonnées en tenant compte du zoom et de la translation
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
       
@@ -309,6 +314,30 @@ export default {
       }
     },
     handleMouseMove(event) {
+      if (this.isMiddleMouseDown) {
+        const deltaX = event.clientX - this.lastMousePosition.x;
+        const deltaY = event.clientY - this.lastMousePosition.y;
+        
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+        
+        // Calculer les limites de translation
+        const scaledImageWidth = this.imageSize.width * this.scale;
+        const scaledImageHeight = this.imageSize.height * this.scale;
+        
+        const minX = containerWidth - scaledImageWidth;
+        const minY = containerHeight - scaledImageHeight;
+        
+        // Appliquer la translation avec les limites
+        const newX = Math.min(0, Math.max(minX, this.translation.x + deltaX));
+        const newY = Math.min(0, Math.max(minY, this.translation.y + deltaY));
+        
+        this.translation = { x: newX, y: newY };
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+        return;
+      }
+
       if (this.isDraggingPoint) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
@@ -333,29 +362,6 @@ export default {
         const newLines = { ...this.calibrationLines };
         newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
         this.$emit('update:calibrationLines', newLines);
-      }
-
-      if (this.isMiddleMouseDown) {
-        const deltaX = event.clientX - this.lastMousePosition.x;
-        const deltaY = event.clientY - this.lastMousePosition.y;
-        
-        const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const containerWidth = rect.width;
-        const containerHeight = rect.height;
-        
-        // Calculer les limites de translation
-        const scaledImageWidth = this.imageSize.width * this.scale;
-        const scaledImageHeight = this.imageSize.height * this.scale;
-        
-        const minX = containerWidth - scaledImageWidth;
-        const minY = containerHeight - scaledImageHeight;
-        
-        // Appliquer la translation avec les limites
-        const newX = Math.min(0, Math.max(minX, this.translation.x + deltaX));
-        const newY = Math.min(0, Math.max(minY, this.translation.y + deltaY));
-        
-        this.translation = { x: newX, y: newY };
-        this.lastMousePosition = { x: event.clientX, y: event.clientY };
       }
     },
     handleMouseUp(event) {
