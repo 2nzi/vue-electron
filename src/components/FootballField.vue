@@ -27,6 +27,36 @@
                 :fill="getPointColor(index)"
                 class="keypoint"
                 @click="selectPoint(index)" />
+
+        <!-- Cercle central -->
+        <circle 
+          cx="52.5" 
+          cy="34" 
+          r="9.15" 
+          fill="none" 
+          :stroke="getLineColor('center_circle')"
+          class="field-line"
+          @click="selectLine('center_circle')" />
+          
+        <!-- Arcs de cercle des corners -->
+        <path 
+          v-for="corner in corners" 
+          :key="'corner-'+corner.position"
+          :d="getCornerArc(corner)"
+          fill="none"
+          :stroke="getLineColor('corner_arc')"
+          class="field-line"
+          @click="selectLine('corner_arc')" />
+        
+        <!-- Arcs des surfaces de réparation -->
+        <path 
+          v-for="arc in penaltyArcs" 
+          :key="'penalty-arc-'+arc.side"
+          :d="getPenaltyArc(arc)"
+          fill="none"
+          :stroke="getLineColor('penalty_arc_' + arc.side)"
+          class="field-line"
+          @click="selectLine('penalty_arc_' + arc.side)" />
       </g>
     </svg>
     
@@ -70,7 +100,27 @@ const LINES = {
   'Small rect. left top': { name: 'Small rect. left top', description: 'Petite surface gauche - ligne haute' },
   'Small rect. right bottom': { name: 'Small rect. right bottom', description: 'Petite surface droite - ligne basse' },
   'Small rect. right main': { name: 'Small rect. right main', description: 'Petite surface droite - ligne parallèle' },
-  'Small rect. right top': { name: 'Small rect. right top', description: 'Petite surface droite - ligne haute' }
+  'Small rect. right top': { name: 'Small rect. right top', description: 'Petite surface droite - ligne haute' },
+  center_circle: {
+    name: "Cercle central",
+    type: "circle",
+    color: "#00FF15"
+  },
+  corner_arc: {
+    name: "Arc de corner",
+    type: "arc",
+    color: "#00FF15"
+  },
+  penalty_arc_left: {
+    name: "Arc de réparation gauche",
+    type: "arc",
+    color: "#00FF15"
+  },
+  penalty_arc_right: {
+    name: "Arc de réparation droit",
+    type: "arc",
+    color: "#00FF15"
+  }
 };
 
 // Définition des dimensions standard d'un terrain de football
@@ -158,7 +208,17 @@ export default {
         'Goal right crossbar': { x1: 110, y1: 30.34, x2: 110, y2: 37.66 },
         'Goal right post right': { x1: 105, y1: 37.66, x2: 110, y2: 37.66 },
       },
-      lastSelected: null // 'point' ou 'line'
+      lastSelected: null, // 'point' ou 'line'
+      corners: [
+        { x: 0, y: 0, position: 'top-left' },
+        { x: 105, y: 0, position: 'top-right' },
+        { x: 0, y: 68, position: 'bottom-left' },
+        { x: 105, y: 68, position: 'bottom-right' }
+      ],
+      penaltyArcs: [
+        { x: 11, y: 34, side: 'left' },
+        { x: 94, y: 34, side: 'right' }
+      ]
     }
   },
   methods: {
@@ -194,6 +254,42 @@ export default {
         return this.positionedLines[lineName] ? '#FFFF00' : 'red';
       }
       return this.positionedLines[lineName] ? '#00FF15' : 'white';
+    },
+    getCornerArc(corner) {
+      const radius = 1;
+      const largeArc = 0;
+      const sweep = 1;
+      
+      if (corner.x === 0 && corner.y === 0) {
+        return `M ${corner.x} ${corner.y + radius} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x + radius} ${corner.y}`;
+      } else if (corner.x === 105 && corner.y === 0) {
+        return `M ${corner.x - radius} ${corner.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x} ${corner.y + radius}`;
+      } else if (corner.x === 0 && corner.y === 68) {
+        return `M ${corner.x + radius} ${corner.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x} ${corner.y - radius}`;
+      } else {
+        return `M ${corner.x} ${corner.y - radius} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x - radius} ${corner.y}`;
+      }
+    },
+    
+    getPenaltyArc(arc) {
+      const radius = 9.15;
+      const startAngle = arc.side === 'left' ? -53 : -127;
+      const endAngle = arc.side === 'left' ? 53 : 127;
+      
+      const start = {
+        x: arc.x + radius * Math.cos(startAngle * Math.PI / 180),
+        y: arc.y + radius * Math.sin(startAngle * Math.PI / 180)
+      };
+      
+      const end = {
+        x: arc.x + radius * Math.cos(endAngle * Math.PI / 180),
+        y: arc.y + radius * Math.sin(endAngle * Math.PI / 180)
+      };
+      
+      const largeArc = 0;
+      const sweep = arc.side === 'left' ? 1 : 0;
+      
+      return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${end.x} ${end.y}`;
     }
   }
 }
