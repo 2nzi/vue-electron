@@ -28,12 +28,6 @@
             <p>session: {{ selectedVideo.session || 'nom_de_la_session' }}</p>
             <p>création: {{ new Date().toLocaleDateString() }}</p>
           </div>
-          <button 
-            class="save-btn" 
-            @click="saveCalibration"
-            :disabled="Object.keys(calibrationPoints).length === 0">
-            Sauvegarder la calibration
-          </button>
         </div>
 
         <div class="video-display">
@@ -63,6 +57,14 @@
                      }">
                 </div>
               </div>
+            </div>
+            <div class="save-section">
+              <button 
+                class="save-btn" 
+                @click="saveCalibration"
+                :disabled="Object.keys(calibrationPoints).length === 0">
+                <span class="save-text">Sauvegarder la calibration</span>
+              </button>
             </div>
           </div>
           <div class="field-container">
@@ -532,6 +534,7 @@ export default {
   flex: 2;
   position: relative;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   min-height: 0;
@@ -642,37 +645,53 @@ export default {
   border-radius: 4px;
 }
 
-.save-btn {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1rem;
+.save-section {
+  position: absolute;
+  bottom: -45px;
+  left: 0;
+  padding: 0.5rem;
 }
 
-.save-btn:hover {
-  background-color: #45a049;
+.save-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #cccccc;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.save-btn:not(:disabled) {
+  color: #ffffff;
+  border-color: #4CAF50;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3),
+              inset 0 0 10px rgba(76, 175, 80, 0.2);
+}
+
+.save-btn:hover:not(:disabled) {
+  background-color: rgba(76, 175, 80, 0.15);
+  border-color: #4CAF50;
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.4),
+              inset 0 0 15px rgba(76, 175, 80, 0.3);
+}
+
+.save-btn:active:not(:disabled) {
+  background-color: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3),
+              inset 0 0 8px rgba(76, 175, 80, 0.2);
 }
 
 .save-btn:disabled {
-  background-color: #cccccc;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.image-container {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  position: relative;
-}
-
-.image-container img {
-  max-width: none;
-  max-height: none;
-  position: relative;
-  transition: transform 0.05s ease-out;
+.save-text {
+  opacity: 1;
 }
 </style> 
