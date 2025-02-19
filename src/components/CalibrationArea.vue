@@ -1,0 +1,454 @@
+<template>
+  <div 
+    class="video-frame-container" 
+    tabindex="0" 
+    ref="container"
+    @keydown="handleKeyDown"
+    @focus="handleFocus"
+    @blur="handleBlur">
+    <div class="video-frame" 
+         ref="imageContainer"
+         :style="frameStyle"
+         @wheel.prevent="handleZoom"
+         @mousedown="handleMouseDown"
+         @mousemove="handleMouseMove"
+         @mouseup="stopPan"
+         @mouseleave="stopPan">
+      <div class="image-container" :style="transformStyle">
+        <img v-if="thumbnail" 
+             :src="thumbnail" 
+             alt="Video frame"
+             @load="initializeImage"
+             ref="image"
+             class="video-image" />
+        <div v-for="(point, index) in calibrationPoints" 
+             :key="index"
+             class="calibration-point"
+             :class="{ 'selected-point': selectedFieldPoint && Number(selectedFieldPoint.index) === Number(index) }"
+             :style="{
+               left: `${point.x}px`,
+               top: `${point.y}px`
+             }">
+        </div>
+      </div>
+    </div>
+    <div class="save-section">
+      <button 
+        class="save-btn" 
+        @click="$emit('save-calibration')"
+        :disabled="Object.keys(calibrationPoints).length === 0">
+        <span class="save-text">Sauvegarder la calibration</span>
+      </button>
+    </div>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'CalibrationArea',
+  props: {
+    thumbnail: {
+      type: String,
+      default: null
+    },
+    calibrationPoints: {
+      type: Object,
+      default: () => ({})
+    },
+    selectedFieldPoint: {
+      type: Object,
+      default: null
+    }
+  },
+  emits: [
+    'save-calibration',
+    'point-placed',
+    'update:thumbnail',
+    'update:calibrationPoints',
+    'update:selectedFieldPoint'
+  ],
+  data() {
+    return {
+      scale: 1,
+      translation: { x: 0, y: 0 },
+      aspectRatio: 1,
+      imageSize: { width: 0, height: 0 },
+      isPanning: false,
+      isMiddleMouseDown: false,
+      lastMousePosition: { x: 0, y: 0 },
+    }
+  },
+  computed: {
+    frameStyle() {
+      if (!this.aspectRatio) return {};
+      
+      const container = this.$refs.imageContainer?.parentElement;
+      if (!container) return {};
+      
+      const parentWidth = container.clientWidth;
+      const parentHeight = container.clientHeight;
+      
+      let width, height;
+      
+      if (parentWidth / parentHeight > this.aspectRatio) {
+        height = parentHeight;
+        width = height * this.aspectRatio;
+      } else {
+        width = parentWidth;
+        height = width / this.aspectRatio;
+      }
+      
+      return {
+        width: `${width}px`,
+        height: `${height}px`
+      };
+    },
+    transformStyle() {
+      return {
+        transform: `translate(${this.translation.x}px, ${this.translation.y}px) scale(${this.scale})`,
+        transformOrigin: '0 0'
+      }
+    }
+  },
+  mounted() {
+    // Ajouter l'écouteur d'événements au niveau du document
+    document.addEventListener('keydown', this.handleKeyDown);
+  },
+  beforeUnmount() {
+    // Nettoyer l'écouteur d'événements
+    document.removeEventListener('keydown', this.handleKeyDown);
+  },
+  methods: {
+    async loadVideos() {
+      try {
+        this.videos = await window.electron.getVideosFromFolder(this.folderPath)
+        if (this.videos.length > 0) {
+          await this.selectVideo(this.videos[3])
+          // await this.selectVideo(this.videos[0])
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement des vidéos:', error)
+      }
+    },
+    async selectVideo(video) {
+      this.$emit('update:thumbnail', null);
+      try {
+        const response = await fetch(`http://localhost:8000/video/first-frame?video_path=${encodeURIComponent(video.path)}`);
+        if (!response.ok) {
+          throw new Error('Erreur lors de la récupération de la frame');
+        }
+        const data = await response.json();
+        this.$emit('update:thumbnail', data.data);
+      } catch (error) {
+        console.error('Erreur lors du chargement de la première frame:', error);
+        this.$emit('update:thumbnail', null);
+      }
+    },
+    toggleSidebar() {
+      this.showSidebar = !this.showSidebar
+    },
+    initializeImage(event) {
+      const image = event.target;
+      
+      this.imageSize = {
+        width: image.naturalWidth,
+        height: image.naturalHeight
+      };
+      
+      this.aspectRatio = this.imageSize.width / this.imageSize.height;
+    },
+    handleZoom(event) {
+      const zoomFactor = 0.1;
+      const delta = Math.sign(event.deltaY) * -1;
+      const newScale = this.scale + delta * zoomFactor;
+      
+      // Limiter le zoom entre 1x et 5x
+      const oldScale = this.scale;
+      this.scale = Math.min(Math.max(newScale, 1), 15);
+      
+      // Si on revient à l'échelle 1, on réinitialise la translation
+      if (this.scale === 1) {
+        this.translation = { x: 0, y: 0 };
+        return;
+      }
+      
+      if (this.scale !== oldScale) {
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Point dans l'image originale que nous voulons garder sous la souris
+        const pointX = (mouseX - this.translation.x) / oldScale;
+        const pointY = (mouseY - this.translation.y) / oldScale;
+
+        // Calculer la nouvelle translation pour maintenir le point sous la souris
+        this.translation = {
+          x: mouseX - (pointX * this.scale),
+          y: mouseY - (pointY * this.scale)
+        };
+
+      }
+    },
+    handleFieldPointSelected(pointData) {
+      this.$emit('update:selectedFieldPoint', pointData);
+    },
+    handleMouseDown(event) {
+      if (event.button === 1) {
+        event.preventDefault();
+        this.isMiddleMouseDown = true;
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+      } else if (event.button === 0 && this.selectedFieldPoint) {
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        const pointX = (mouseX - this.translation.x) / this.scale;
+        const pointY = (mouseY - this.translation.y) / this.scale;
+        
+        const index = Number(this.selectedFieldPoint.index);
+        const newPoints = { ...this.calibrationPoints };
+        newPoints[index] = { x: pointX, y: pointY };
+        
+        // Émettre les mises à jour vers le parent
+        this.$emit('update:calibrationPoints', newPoints);
+        this.$emit('update:selectedFieldPoint', null);
+      }
+    },
+    handleMouseMove(event) {
+      if (this.isMiddleMouseDown) {
+        const deltaX = event.clientX - this.lastMousePosition.x;
+        const deltaY = event.clientY - this.lastMousePosition.y;
+        
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const containerWidth = rect.width;
+        const containerHeight = rect.height;
+        
+        // Calculer les limites de translation
+        const scaledImageWidth = this.imageSize.width * this.scale;
+        const scaledImageHeight = this.imageSize.height * this.scale;
+        
+        const minX = containerWidth - scaledImageWidth;
+        const minY = containerHeight - scaledImageHeight;
+        
+        // Appliquer la translation avec les limites
+        const newX = Math.min(0, Math.max(minX, this.translation.x + deltaX));
+        const newY = Math.min(0, Math.max(minY, this.translation.y + deltaY));
+        
+        this.translation = { x: newX, y: newY };
+        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+      }
+    },
+    handleMouseUp(event) {
+      if (event.button === 1) {
+        this.isMiddleMouseDown = false;
+      }
+    },
+    stopPan() {
+      this.isMiddleMouseDown = false;
+    },
+    async saveCalibration() {
+      if (!this.selectedVideo) return;
+
+      // Récupérer les keypoints depuis le FootballField
+      const fieldKeypoints = this.$refs.footballField.keypoints;
+
+      // Préparation des données de calibration
+      const calibrationData = {
+        metadata: {
+          video_name: this.selectedVideo.name,
+          video_path: this.selectedVideo.path,
+          calibration_date: new Date().toISOString(),
+          total_keypoints: fieldKeypoints.length,
+          positioned_keypoints: Object.keys(this.calibrationPoints).length,
+          image_size: this.imageSize
+        },
+        keypoints: {},
+        field_dimensions: {
+          width: 105,
+          height: 68
+        }
+      };
+
+      // Conversion des points en format plus lisible
+      for (const [index, point] of Object.entries(this.calibrationPoints)) {
+        calibrationData.keypoints[index] = {
+          image_coordinates: {
+            x: Math.round(point.x * 100) / 100,
+            y: Math.round(point.y * 100) / 100
+          },
+          field_coordinates: {
+            x: Math.round(fieldKeypoints[index][0] * 100) / 100,
+            y: Math.round(fieldKeypoints[index][1] * 100) / 100
+          }
+        };
+      }
+
+      const requestData = {
+        video_path: this.selectedVideo.path,
+        calibration_data: calibrationData
+      };
+
+      console.log('Données envoyées:', requestData); // Pour déboguer
+
+      try {
+        // Appel à l'API Python
+        const response = await fetch('http://localhost:8000/calibration/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Erreur détaillée:', errorData); // Pour déboguer
+          throw new Error(errorData.detail || 'Erreur lors de la sauvegarde');
+        }
+
+        const result = await response.json();
+        
+        if (result.success) {
+          alert('Calibration sauvegardée avec succès !');
+        } else {
+          throw new Error(result.message || 'Erreur lors de la sauvegarde');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        alert('Erreur lors de la sauvegarde de la calibration');
+      }
+    },
+    handleKeyDown(event) {
+      if (event.key === 'Delete' && this.selectedFieldPoint) {
+        event.preventDefault();
+        const newPoints = { ...this.calibrationPoints };
+        delete newPoints[this.selectedFieldPoint.index];
+        this.$emit('update:calibrationPoints', newPoints);
+        this.$emit('update:selectedFieldPoint', null);
+      }
+    },
+    handleFocus() {
+      console.log('Container focused');
+    },
+    handleBlur() {
+      console.log('Container lost focus');
+    },
+    handleWheel(event) {
+      event.preventDefault();
+      
+      // Si la touche Ctrl est enfoncée, on gère le zoom
+      if (event.ctrlKey) {
+        // Gérer le zoom si vous avez cette fonctionnalité
+        return;
+      }
+      
+      // Sinon, on gère le pan (translation)
+      if (event.shiftKey) {
+        // Si Shift est enfoncé, on déplace horizontalement
+        this.panPosition.x -= event.deltaY;
+      } else {
+        // Déplacement vertical par défaut
+        this.panPosition.y -= event.deltaY;
+      }
+    }
+  }
+}
+</script>
+
+<style scoped>
+.video-frame-container {
+  flex: 2;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+  background-color: #1a1a1a;
+  border-radius: 4px;
+  padding: 10px;
+  outline: none; /* Pour enlever le contour bleu quand l'élément est focus */
+}
+
+.video-frame {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: calc(100% - 50px);
+  margin-bottom: 45px;
+}
+
+.image-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+}
+
+.video-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.calibration-point {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background-color: #4CAF50;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.8),
+              0 0 12px rgba(76, 175, 80, 0.5);
+}
+
+.selected-point {
+  background-color: #FFC107;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.8),
+              0 0 15px rgba(255, 193, 7, 0.5);
+}
+
+.save-section {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+}
+
+.save-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid #4CAF50;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.3),
+              inset 0 0 10px rgba(76, 175, 80, 0.2);
+}
+
+.save-btn:hover:not(:disabled) {
+  background-color: rgba(76, 175, 80, 0.15);
+  border-color: #4CAF50;
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.4),
+              inset 0 0 15px rgba(76, 175, 80, 0.3);
+}
+
+.save-btn:active:not(:disabled) {
+  background-color: rgba(76, 175, 80, 0.2);
+  box-shadow: 0 0 8px rgba(76, 175, 80, 0.3),
+              inset 0 0 8px rgba(76, 175, 80, 0.2);
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-text {
+  opacity: 1;
+}
+</style> 
