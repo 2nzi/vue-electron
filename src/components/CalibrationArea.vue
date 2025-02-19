@@ -118,6 +118,12 @@ export default {
       placedLinePoints: [],
       currentLinePoints: [],
       isDrawingLine: false,
+      isDraggingPoint: false,
+      selectedPointIndex: null,
+      draggedLineId: null,
+      proximityThreshold: 10,
+      tempPoint: null,
+      isWaitingForValidation: false,
     }
   },
   computed: {
@@ -235,20 +241,45 @@ export default {
       this.$emit('update:selectedFieldPoint', pointData);
     },
     handleMouseDown(event) {
-      if (event.button === 1) { // Clic molette
-        this.isMiddleMouseDown = true;
-        this.lastMousePosition = { x: event.clientX, y: event.clientY };
-        return;
-      }
+      if (event.button === 1) return; // Ignore le clic molette
 
       const rect = this.$refs.imageContainer.getBoundingClientRect();
       const x = (event.clientX - rect.left) / this.scale - this.translation.x;
       const y = (event.clientY - rect.top) / this.scale - this.translation.y;
 
       if (this.selectedFieldLine) {
-        // Gestion des polylines
+        const nearestPoint = this.findNearestPoint(x, y);
+        
         if (event.button === 0) { // Clic gauche
-          this.currentLinePoints.push({ x, y });
+          if (this.isWaitingForValidation) {
+            // Valider la position au nouvel endroit cliqué
+            const newLines = { ...this.calibrationLines };
+            newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
+            this.$emit('update:calibrationLines', newLines);
+            
+            // Réinitialiser l'état
+            this.isDraggingPoint = false;
+            this.isWaitingForValidation = false;
+            this.selectedPointIndex = null;
+            this.draggedLineId = null;
+            this.tempPoint = null;
+            return;
+          }
+          
+          if (nearestPoint) {
+            // Commencer le déplacement
+            this.isDraggingPoint = true;
+            this.isWaitingForValidation = true;
+            this.selectedPointIndex = nearestPoint.index;
+            this.draggedLineId = this.selectedFieldLine.id;
+            this.tempPoint = { ...nearestPoint.point };
+            return;
+          }
+
+          // Si on n'est pas en train de déplacer un point, ajouter un nouveau point
+          if (!this.isWaitingForValidation) {
+            this.currentLinePoints.push({ x, y });
+          }
         } else if (event.button === 2) { // Clic droit
           if (this.currentLinePoints.length >= 2) {
             const newLines = { ...this.calibrationLines };
@@ -267,6 +298,17 @@ export default {
       }
     },
     handleMouseMove(event) {
+      if (this.isWaitingForValidation) {
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / this.scale - this.translation.x;
+        const y = (event.clientY - rect.top) / this.scale - this.translation.y;
+
+        // Mettre à jour la position temporaire
+        const newLines = { ...this.calibrationLines };
+        newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
+        this.$emit('update:calibrationLines', newLines);
+      }
+
       if (this.isMiddleMouseDown) {
         const deltaX = event.clientX - this.lastMousePosition.x;
         const deltaY = event.clientY - this.lastMousePosition.y;
@@ -291,6 +333,16 @@ export default {
       }
     },
     handleMouseUp(event) {
+      if (this.isDraggingPoint) {
+        const newLines = { ...this.calibrationLines };
+        newLines[this.draggedLineId].points[this.selectedPointIndex] = this.tempPoint;
+        this.$emit('update:calibrationLines', newLines);
+        
+        this.isDraggingPoint = false;
+        this.selectedPointIndex = null;
+        this.draggedLineId = null;
+        this.tempPoint = null;
+      }
       if (event.button === 1) {
         this.isMiddleMouseDown = false;
       }
@@ -417,6 +469,26 @@ export default {
     getPolylinePoints(points) {
       if (!points) return '';
       return points.map(p => `${p.x},${p.y}`).join(' ');
+    },
+    findNearestPoint(x, y) {
+      if (!this.selectedFieldLine || !this.calibrationLines[this.selectedFieldLine.id]) return null;
+      
+      const points = this.calibrationLines[this.selectedFieldLine.id].points;
+      let nearestPoint = null;
+      let minDistance = this.proximityThreshold;
+
+      points.forEach((point, index) => {
+        const dx = point.x - x;
+        const dy = point.y - y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestPoint = { index, point };
+        }
+      });
+
+      return nearestPoint;
     }
   }
 }
@@ -562,6 +634,19 @@ export default {
   stroke: white;
   stroke-width: 1;
   transition: all 0.2s ease;
+  cursor: move;
+}
+
+.polyline-point:hover {
+  fill: #FFC107;
+  r: 6;
+  stroke-width: 2;
+}
+
+.polyline-point.dragging {
+  fill: #FF4081;
+  r: 7;
+  stroke-width: 3;
 }
 
 .selected-line-point {
