@@ -48,7 +48,10 @@
                     :cy="point.y"
                     r="4"
                     class="polyline-point"
-                    :class="{ 'selected-line-point': selectedFieldLine && selectedFieldLine.id === id }"
+                    :class="{
+                      'selected-line-point': selectedFieldLine && selectedFieldLine.id === id,
+                      'dragging': isDraggingPoint && draggedLineId === id && selectedPointIndex === index
+                    }"
             />
           </svg>
         </div>
@@ -59,6 +62,15 @@
                left: `${point.x}px`,
                top: `${point.y}px`
              }" />
+        <svg class="temp-polyline-svg" v-if="currentLinePoints.length > 0">
+          <polyline
+            :points="getPolylinePoints(currentLinePoints)"
+            stroke="#FFC107"
+            stroke-dasharray="5,5"
+            fill="none"
+            stroke-width="2"
+          />
+        </svg>
       </div>
     </div>
     <div class="save-section">
@@ -241,63 +253,68 @@ export default {
       this.$emit('update:selectedFieldPoint', pointData);
     },
     handleMouseDown(event) {
-      if (event.button === 1) return; // Ignore le clic molette
-
       const rect = this.$refs.imageContainer.getBoundingClientRect();
       const x = (event.clientX - rect.left) / this.scale - this.translation.x;
       const y = (event.clientY - rect.top) / this.scale - this.translation.y;
 
-      if (this.selectedFieldLine) {
-        const nearestPoint = this.findNearestPoint(x, y);
-        
-        if (event.button === 0) { // Clic gauche
-          if (this.isWaitingForValidation) {
-            // Valider la position au nouvel endroit cliqué
-            const newLines = { ...this.calibrationLines };
-            newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
-            this.$emit('update:calibrationLines', newLines);
-            
-            // Réinitialiser l'état
-            this.isDraggingPoint = false;
-            this.isWaitingForValidation = false;
-            this.selectedPointIndex = null;
-            this.draggedLineId = null;
-            this.tempPoint = null;
-            return;
+      if (event.button === 0) { // Clic gauche
+        if (this.isDraggingPoint) {
+          // Valider la position au clic
+          const newLines = { ...this.calibrationLines };
+          newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
+          this.$emit('update:calibrationLines', newLines);
+          
+          // Réinitialiser l'état
+          this.isDraggingPoint = false;
+          this.selectedPointIndex = null;
+          this.draggedLineId = null;
+          this.tempPoint = null;
+          return;
+        }
+
+        const nearestPoint = this.findLineByPoint(x, y);
+        if (nearestPoint) {
+          // Si le point appartient à une autre ligne, changer la sélection
+          if (!this.selectedFieldLine || nearestPoint.lineId !== this.selectedFieldLine.id) {
+            this.$emit('update:selectedFieldLine', { id: nearestPoint.lineId });
           }
           
-          if (nearestPoint) {
-            // Commencer le déplacement
-            this.isDraggingPoint = true;
-            this.isWaitingForValidation = true;
-            this.selectedPointIndex = nearestPoint.index;
-            this.draggedLineId = this.selectedFieldLine.id;
-            this.tempPoint = { ...nearestPoint.point };
-            return;
-          }
-
-          // Si on n'est pas en train de déplacer un point, ajouter un nouveau point
-          if (!this.isWaitingForValidation) {
-            this.currentLinePoints.push({ x, y });
-          }
-        } else if (event.button === 2) { // Clic droit
-          if (this.currentLinePoints.length >= 2) {
-            const newLines = { ...this.calibrationLines };
-            newLines[this.selectedFieldLine.id] = {
-              points: [...this.currentLinePoints]
-            };
-            this.$emit('update:calibrationLines', newLines);
-            this.currentLinePoints = [];
-          }
+          // Commencer le déplacement du point
+          this.isDraggingPoint = true;
+          this.selectedPointIndex = nearestPoint.pointIndex;
+          this.draggedLineId = nearestPoint.lineId;
+          this.tempPoint = { ...nearestPoint.point };
+          return;
         }
-      } else if (this.selectedFieldPoint && event.button === 0) {
-        // Gestion des keypoints simples
-        const newPoints = { ...this.calibrationPoints };
-        newPoints[this.selectedFieldPoint.index] = { x, y };
-        this.$emit('update:calibrationPoints', newPoints);
+
+        // Si une ligne est sélectionnée, ajouter un nouveau point
+        if (this.selectedFieldLine) {
+          this.currentLinePoints.push({ x, y });
+        }
+      } else if (event.button === 2 && this.selectedFieldLine) { // Clic droit
+        if (this.currentLinePoints.length >= 2) {
+          // Créer ou mettre à jour la ligne
+          const newLines = { ...this.calibrationLines };
+          newLines[this.selectedFieldLine.id] = {
+            points: [...this.currentLinePoints]
+          };
+          this.$emit('update:calibrationLines', newLines);
+          this.currentLinePoints = []; // Réinitialiser les points temporaires
+        }
       }
     },
     handleMouseMove(event) {
+      if (this.isDraggingPoint) {
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const x = (event.clientX - rect.left) / this.scale - this.translation.x;
+        const y = (event.clientY - rect.top) / this.scale - this.translation.y;
+
+        // Mettre à jour la position temporaire
+        const newLines = { ...this.calibrationLines };
+        newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
+        this.$emit('update:calibrationLines', newLines);
+      }
+
       if (this.isWaitingForValidation) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
         const x = (event.clientX - rect.left) / this.scale - this.translation.x;
@@ -470,25 +487,25 @@ export default {
       if (!points) return '';
       return points.map(p => `${p.x},${p.y}`).join(' ');
     },
-    findNearestPoint(x, y) {
-      if (!this.selectedFieldLine || !this.calibrationLines[this.selectedFieldLine.id]) return null;
-      
-      const points = this.calibrationLines[this.selectedFieldLine.id].points;
-      let nearestPoint = null;
-      let minDistance = this.proximityThreshold;
-
-      points.forEach((point, index) => {
-        const dx = point.x - x;
-        const dy = point.y - y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          nearestPoint = { index, point };
+    findLineByPoint(x, y) {
+      for (const [lineId, line] of Object.entries(this.calibrationLines)) {
+        const points = line.points;
+        for (let i = 0; i < points.length; i++) {
+          const point = points[i];
+          const dx = point.x - x;
+          const dy = point.y - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < this.proximityThreshold) {
+            return {
+              lineId,
+              pointIndex: i,
+              point
+            };
+          }
         }
-      });
-
-      return nearestPoint;
+      }
+      return null;
     }
   }
 }
@@ -634,13 +651,18 @@ export default {
   stroke: white;
   stroke-width: 1;
   transition: all 0.2s ease;
-  cursor: move;
+  pointer-events: all;
+  cursor: pointer;
 }
 
 .polyline-point:hover {
   fill: #FFC107;
   r: 6;
   stroke-width: 2;
+}
+
+.selected-line .polyline-point {
+  cursor: grab;
 }
 
 .polyline-point.dragging {
@@ -662,5 +684,14 @@ export default {
   border-radius: 50%;
   border: 2px solid white;
   z-index: 2;
+}
+
+.temp-polyline-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 </style> 
