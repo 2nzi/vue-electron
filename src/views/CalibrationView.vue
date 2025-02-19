@@ -151,7 +151,7 @@ export default {
     },
 
     async saveCalibration() {
-      if (!this.selectedVideo) return;
+      if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return;
 
       const fieldKeypoints = this.$refs.footballField.keypoints;
       const calibrationData = {
@@ -163,6 +163,7 @@ export default {
           positioned_keypoints: Object.keys(this.calibrationPoints).length,
         },
         keypoints: {},
+        lines: this.calibrationLines,
         field_dimensions: {
           width: 105,
           height: 68

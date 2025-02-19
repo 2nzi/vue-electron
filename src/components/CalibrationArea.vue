@@ -81,7 +81,7 @@
       <button 
         class="save-btn" 
         @click="$emit('save-calibration')"
-        :disabled="Object.keys(calibrationPoints).length === 0">
+        :disabled="Object.keys(calibrationLines).length === 0">
         <span class="save-text">Sauvegarder la calibration</span>
       </button>
     </div>
@@ -439,77 +439,35 @@ export default {
     stopPan() {
       this.isMiddleMouseDown = false;
     },
-    async saveCalibration() {
-      if (!this.selectedVideo) return;
+    saveCalibration() {
+      const lineExport = {};
+      
+      // Pour chaque ligne calibrée
+      for (const [lineId, line] of Object.entries(this.calibrationLines)) {
+        // Ne garder que les coordonnées x,y des points
+        const points = line.points.map(point => ({
+          x: Math.round(point.x),
+          y: Math.round(point.y)
+        }));
+        
+        // Ajouter au dictionnaire final
+        lineExport[lineId] = points;
+      }
 
-      // Récupérer les keypoints depuis le FootballField
-      const fieldKeypoints = this.$refs.footballField.keypoints;
-
-      // Préparation des données de calibration
+      // Vous pouvez maintenant utiliser lineExport qui aura le format souhaité
+      console.log(JSON.stringify(lineExport, null, 2));
+      
+      // Si vous voulez toujours sauvegarder les autres données
       const calibrationData = {
         metadata: {
           video_name: this.selectedVideo.name,
           video_path: this.selectedVideo.path,
-          calibration_date: new Date().toISOString(),
-          total_keypoints: fieldKeypoints.length,
-          positioned_keypoints: Object.keys(this.calibrationPoints).length,
-          image_size: this.imageSize
+          calibration_date: new Date().toISOString()
         },
-        keypoints: {},
-        field_dimensions: {
-          width: 105,
-          height: 68
-        }
+        lines: lineExport
       };
 
-      // Conversion des points en format plus lisible
-      for (const [index, point] of Object.entries(this.calibrationPoints)) {
-        calibrationData.keypoints[index] = {
-          image_coordinates: {
-            x: Math.round(point.x * 100) / 100,
-            y: Math.round(point.y * 100) / 100
-          },
-          field_coordinates: {
-            x: Math.round(fieldKeypoints[index][0] * 100) / 100,
-            y: Math.round(fieldKeypoints[index][1] * 100) / 100
-          }
-        };
-      }
-
-      const requestData = {
-        video_path: this.selectedVideo.path,
-        calibration_data: calibrationData
-      };
-
-      console.log('Données envoyées:', requestData); // Pour déboguer
-
-      try {
-        // Appel à l'API Python
-        const response = await fetch('http://localhost:8000/calibration/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestData)
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error('Erreur détaillée:', errorData); // Pour déboguer
-          throw new Error(errorData.detail || 'Erreur lors de la sauvegarde');
-        }
-
-        const result = await response.json();
-        
-        if (result.success) {
-          alert('Calibration sauvegardée avec succès !');
-        } else {
-          throw new Error(result.message || 'Erreur lors de la sauvegarde');
-        }
-      } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error);
-        alert('Erreur lors de la sauvegarde de la calibration');
-      }
+      this.$emit('save-calibration', calibrationData);
     },
     handleKeyDown(event) {
       if (event.key === 'Control') {
