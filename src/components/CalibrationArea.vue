@@ -102,7 +102,15 @@ export default {
     },
     calibrationLines: {
       type: Object,
-      default: () => ({})
+      default: () => ({}),
+      validator: function(lines) {
+        return Object.values(lines).every(line => {
+          if (line.type === 'circle' || line.type === 'arc') {
+            return line.center && typeof line.radius === 'number';
+          }
+          return Array.isArray(line.points);
+        });
+      }
     },
     selectedFieldPoint: {
       type: Object,
@@ -311,6 +319,27 @@ export default {
         }
 
         if (!this.isCreatingLine) {
+          if (this.isCtrlPressed) {
+            const nearestPoint = this.findLineByPoint(x, y);
+            const circleIntersections = this.findCircleIntersections(x, y, 
+              this.selectedFieldLine?.id);
+            
+            if (nearestPoint || circleIntersections.length > 0) {
+              if (this.currentLinePoints.length === 0) {
+                // Commencer une nouvelle ligne avec un point d'intersection
+                this.isCreatingLine = true;
+                if (nearestPoint) {
+                  this.currentLinePoints.push(nearestPoint.point);
+                  this.sharedPoints.add(`${nearestPoint.lineId}-${nearestPoint.pointIndex}`);
+                } else {
+                  // Gérer plusieurs intersections possibles
+                  this.currentLinePoints.push(circleIntersections[0].point);
+                  this.sharedPoints.add(`${circleIntersections[0].lineId}-intersection`);
+                }
+                return;
+              }
+            }
+          }
           // Mode modification
           const nearestPoint = this.findLineByPoint(x, y);
           if (nearestPoint) {
@@ -610,6 +639,34 @@ export default {
         this.currentLinePoints = [];
         this.isCreatingLine = false;
       }
+    },
+    findCircleIntersections(x, y, lineId) {
+      const intersections = [];
+      const threshold = this.proximityThreshold / this.scale;
+      
+      for (const [id, line] of Object.entries(this.calibrationLines)) {
+        if (id === lineId) continue;
+        
+        // Vérifier si la ligne est un cercle ou un arc
+        if (line.type === 'circle' || line.type === 'arc') {
+          const center = line.center;
+          const radius = line.radius;
+          
+          // Calculer la distance au centre
+          const dx = x - center.x;
+          const dy = y - center.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          // Si on est proche du rayon, c'est une intersection
+          if (Math.abs(distance - radius) < threshold) {
+            intersections.push({
+              lineId: id,
+              point: { x, y }
+            });
+          }
+        }
+      }
+      return intersections;
     }
   }
 }
