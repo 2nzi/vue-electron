@@ -254,8 +254,13 @@ export default {
     },
     handleMouseDown(event) {
       const rect = this.$refs.imageContainer.getBoundingClientRect();
-      const x = (event.clientX - rect.left) / this.scale - this.translation.x;
-      const y = (event.clientY - rect.top) / this.scale - this.translation.y;
+      // Calculer les coordonnées en tenant compte du zoom et de la translation
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+      
+      // Point dans l'image originale
+      const x = (mouseX - this.translation.x) / this.scale;
+      const y = (mouseY - this.translation.y) / this.scale;
 
       if (event.button === 0) { // Clic gauche
         if (this.isDraggingPoint) {
@@ -306,8 +311,12 @@ export default {
     handleMouseMove(event) {
       if (this.isDraggingPoint) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / this.scale - this.translation.x;
-        const y = (event.clientY - rect.top) / this.scale - this.translation.y;
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        // Point dans l'image originale
+        const x = (mouseX - this.translation.x) / this.scale;
+        const y = (mouseY - this.translation.y) / this.scale;
 
         // Mettre à jour la position temporaire
         const newLines = { ...this.calibrationLines };
