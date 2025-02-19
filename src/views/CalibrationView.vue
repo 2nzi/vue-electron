@@ -23,17 +23,23 @@
           <CalibrationArea
             :thumbnail="thumbnail"
             :calibrationPoints="calibrationPoints"
+            :calibrationLines="calibrationLines"
             :selectedFieldPoint="selectedFieldPoint"
+            :selectedFieldLine="selectedFieldLine"
             @update:thumbnail="updateThumbnail"
             @update:calibrationPoints="updateCalibrationPoints"
+            @update:calibrationLines="updateCalibrationLines"
             @update:selectedFieldPoint="updateSelectedFieldPoint"
+            @update:selectedFieldLine="updateSelectedFieldLine"
             @save-calibration="saveCalibration"
           />
           <div class="field-container">
             <FootballField 
               ref="footballField"
               @point-selected="handleFieldPointSelected"
+              @line-selected="handleFieldLineSelected"
               :positionedPoints="calibrationPoints"
+              :positionedLines="calibrationLines"
             />
           </div>
         </div>
@@ -68,6 +74,8 @@ export default {
       showSidebar: true,
       calibrationPoints: {},
       selectedFieldPoint: null,
+      calibrationLines: {},
+      selectedFieldLine: null
     }
   },
   async created() {
@@ -108,10 +116,13 @@ export default {
     },
 
     handleFieldPointSelected(pointData) {
+      this.selectedFieldLine = null;
       this.selectedFieldPoint = pointData;
-      if (this.$refs.footballField) {
-        this.$refs.footballField.selectedPointIndex = pointData ? pointData.index : null;
-      }
+    },
+
+    handleFieldLineSelected(lineData) {
+      this.selectedFieldPoint = null;
+      this.selectedFieldLine = lineData;
     },
 
     updateThumbnail(newThumbnail) {
@@ -122,10 +133,18 @@ export default {
       this.calibrationPoints = { ...newPoints };
     },
 
+    updateCalibrationLines(newLines) {
+      this.calibrationLines = { ...newLines };
+    },
+
     updateSelectedFieldPoint(newPoint) {
       this.selectedFieldPoint = newPoint;
+    },
+
+    updateSelectedFieldLine(newLine) {
+      this.selectedFieldLine = newLine;
       if (this.$refs.footballField) {
-        this.$refs.footballField.selectedPointIndex = newPoint ? newPoint.index : null;
+        this.$refs.footballField.selectedLine = newLine ? newLine.id : null;
       }
     },
 

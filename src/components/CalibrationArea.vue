@@ -30,6 +30,22 @@
                top: `${point.y}px`
              }">
         </div>
+        <div v-for="(line, id) in calibrationLines"
+             :key="'line-'+id"
+             class="calibration-line"
+             :style="{
+               left: `${line.start.x}px`,
+               top: `${line.start.y}px`,
+               width: `${Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y)}px`,
+               transform: `rotate(${Math.atan2(line.end.y - line.start.y, line.end.x - line.start.x)}rad)`
+             }" />
+        <div v-for="(point, index) in linePoints"
+             :key="'temp-'+index"
+             class="calibration-point temp-point"
+             :style="{
+               left: `${point.x}px`,
+               top: `${point.y}px`
+             }" />
       </div>
     </div>
     <div class="save-section">
@@ -55,7 +71,15 @@ export default {
       type: Object,
       default: () => ({})
     },
+    calibrationLines: {
+      type: Object,
+      default: () => ({})
+    },
     selectedFieldPoint: {
+      type: Object,
+      default: null
+    },
+    selectedFieldLine: {
       type: Object,
       default: null
     }
@@ -65,7 +89,8 @@ export default {
     'point-placed',
     'update:thumbnail',
     'update:calibrationPoints',
-    'update:selectedFieldPoint'
+    'update:selectedFieldPoint',
+    'line-points-placed'
   ],
   data() {
     return {
@@ -76,6 +101,8 @@ export default {
       isPanning: false,
       isMiddleMouseDown: false,
       lastMousePosition: { x: 0, y: 0 },
+      linePoints: [],
+      placedLinePoints: [],
     }
   },
   computed: {
@@ -194,23 +221,36 @@ export default {
     },
     handleMouseDown(event) {
       if (event.button === 1) {
-        event.preventDefault();
         this.isMiddleMouseDown = true;
         this.lastMousePosition = { x: event.clientX, y: event.clientY };
-      } else if (event.button === 0 && this.selectedFieldPoint) {
+        return;
+      }
+
+      if (event.button === 0) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const mouseX = event.clientX - rect.left;
-        const mouseY = event.clientY - rect.top;
-        const pointX = (mouseX - this.translation.x) / this.scale;
-        const pointY = (mouseY - this.translation.y) / this.scale;
-        
-        const index = Number(this.selectedFieldPoint.index);
-        const newPoints = { ...this.calibrationPoints };
-        newPoints[index] = { x: pointX, y: pointY };
-        
-        // Émettre les mises à jour vers le parent
-        this.$emit('update:calibrationPoints', newPoints);
-        this.$emit('update:selectedFieldPoint', null);
+        const pointX = (event.clientX - rect.left - this.translation.x) / this.scale;
+        const pointY = (event.clientY - rect.top - this.translation.y) / this.scale;
+
+        if (this.selectedFieldLine) {
+          this.linePoints.push({ x: pointX, y: pointY });
+          
+          if (this.linePoints.length === 2) {
+            const newLines = { ...this.calibrationLines };
+            newLines[this.selectedFieldLine.id] = {
+              start: this.linePoints[0],
+              end: this.linePoints[1]
+            };
+            
+            this.$emit('update:calibrationLines', newLines);
+            this.$emit('update:selectedFieldLine', null);
+            this.linePoints = [];
+          }
+        } else if (this.selectedFieldPoint) {
+          const newPoints = { ...this.calibrationPoints };
+          newPoints[this.selectedFieldPoint.index] = { x: pointX, y: pointY };
+          this.$emit('update:calibrationPoints', newPoints);
+          this.$emit('update:selectedFieldPoint', null);
+        }
       }
     },
     handleMouseMove(event) {
@@ -349,6 +389,10 @@ export default {
         // Déplacement vertical par défaut
         this.panPosition.y -= event.deltaY;
       }
+    },
+    handleLineSelected(points) {
+      this.linePoints = points;
+      this.placedLinePoints = [];
     }
   }
 }
@@ -450,5 +494,28 @@ export default {
 
 .save-text {
   opacity: 1;
+}
+
+.line-points-info {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 0.5rem;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.calibration-line {
+  position: absolute;
+  height: 2px;
+  background-color: #00FF15;
+  transform-origin: left center;
+  pointer-events: none;
+}
+
+.temp-point {
+  background-color: #FFC107;
 }
 </style> 
