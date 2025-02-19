@@ -35,24 +35,28 @@
              :key="'line-'+id"
              class="calibration-polyline">
           <svg class="polyline-svg">
-            <polyline
-              :points="getPolylinePoints(line.points)"
-              :class="{ 'selected-line': selectedFieldLine && selectedFieldLine.id === id }"
-              stroke="#00FF15"
-              fill="none"
-              stroke-width="2"
-            />
-            <circle v-for="(point, index) in line.points"
-                    :key="'point-'+index"
-                    :cx="point.x"
-                    :cy="point.y"
-                    r="4"
-                    class="polyline-point"
-                    :class="{
-                      'selected-line-point': selectedFieldLine && selectedFieldLine.id === id,
-                      'dragging': isDraggingPoint && draggedLineId === id && selectedPointIndex === index
-                    }"
-            />
+            <g v-for="(line, id) in calibrationLines" :key="id">
+              <polyline
+                :points="formatPoints(line.points)"
+                :class="{ 'selected-line': selectedFieldLine && selectedFieldLine.id === id }"
+                fill="none"
+                stroke="#00FF15"
+                stroke-width="2"
+              />
+              <circle v-for="(point, index) in line.points"
+                      :key="'point-'+index"
+                      :cx="point.x"
+                      :cy="point.y"
+                      r="4"
+                      class="polyline-point"
+                      :class="{
+                        'selected-line-point': selectedFieldLine && selectedFieldLine.id === id,
+                        'dragging': isDraggingPoint && draggedLineId === id && selectedPointIndex === index,
+                        'shared-point': sharedPoints.has(`${id}-${index}`),
+                        'hoverable': isCtrlPressed && selectedFieldLine
+                      }"
+              />
+            </g>
           </svg>
         </div>
         <div v-for="(point, index) in currentLinePoints"
@@ -136,6 +140,11 @@ export default {
       proximityThreshold: 10,
       tempPoint: null,
       isWaitingForValidation: false,
+      isCtrlPressed: false,
+      hoveredPoint: null,
+      sharedPoints: new Set(),
+      draggedPoints: [],
+      isCreatingLine: false,
     }
   },
   computed: {
@@ -171,12 +180,12 @@ export default {
     }
   },
   mounted() {
-    // Ajouter l'écouteur d'événements au niveau du document
-    document.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keyup', this.handleKeyUp);
   },
   beforeUnmount() {
-    // Nettoyer l'écouteur d'événements
-    document.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keyup', this.handleKeyUp);
   },
   methods: {
     async loadVideos() {
@@ -255,53 +264,14 @@ export default {
     handleMouseDown(event) {
       if (event.button === 1) { // Clic molette
         this.isMiddleMouseDown = true;
-        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+        this.lastMousePosition = {
+          x: event.clientX,
+          y: event.clientY
+        };
+        event.preventDefault(); // Empêche le comportement par défaut du navigateur
         return;
       }
-
-      const rect = this.$refs.imageContainer.getBoundingClientRect();
-      const mouseX = event.clientX - rect.left;
-      const mouseY = event.clientY - rect.top;
-      
-      // Point dans l'image originale
-      const x = (mouseX - this.translation.x) / this.scale;
-      const y = (mouseY - this.translation.y) / this.scale;
-
-      if (event.button === 0) { // Clic gauche
-        if (this.isDraggingPoint) {
-          // Valider la position au clic
-          const newLines = { ...this.calibrationLines };
-          newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
-          this.$emit('update:calibrationLines', newLines);
-          
-          // Réinitialiser l'état
-          this.isDraggingPoint = false;
-          this.selectedPointIndex = null;
-          this.draggedLineId = null;
-          this.tempPoint = null;
-          return;
-        }
-
-        const nearestPoint = this.findLineByPoint(x, y);
-        if (nearestPoint) {
-          // Si le point appartient à une autre ligne, changer la sélection
-          if (!this.selectedFieldLine || nearestPoint.lineId !== this.selectedFieldLine.id) {
-            this.$emit('update:selectedFieldLine', { id: nearestPoint.lineId });
-          }
-          
-          // Commencer le déplacement du point
-          this.isDraggingPoint = true;
-          this.selectedPointIndex = nearestPoint.pointIndex;
-          this.draggedLineId = nearestPoint.lineId;
-          this.tempPoint = { ...nearestPoint.point };
-          return;
-        }
-
-        // Si une ligne est sélectionnée, ajouter un nouveau point
-        if (this.selectedFieldLine) {
-          this.currentLinePoints.push({ x, y });
-        }
-      } else if (event.button === 2 && this.selectedFieldLine) { // Clic droit
+      if (event.button === 2 && this.selectedFieldLine) { // Clic droit
         if (this.currentLinePoints.length >= 2) {
           // Créer ou mettre à jour la ligne
           const newLines = { ...this.calibrationLines };
@@ -310,61 +280,122 @@ export default {
           };
           this.$emit('update:calibrationLines', newLines);
           this.currentLinePoints = []; // Réinitialiser les points temporaires
+          this.isCreatingLine = false; // Sortir du mode création
+        }
+        return;
+      }
+
+      if (event.button === 0) { // Clic gauche
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+        
+        const x = (mouseX - this.translation.x) / this.scale;
+        const y = (mouseY - this.translation.y) / this.scale;
+
+        if (this.isDraggingPoint) {
+          // Valider la position au clic
+          const newLines = { ...this.calibrationLines };
+          this.draggedPoints.forEach(({ lineId, pointIndex }) => {
+            if (newLines[lineId] && Array.isArray(newLines[lineId].points)) {
+              newLines[lineId].points[pointIndex] = { x, y };
+            }
+          });
+          this.$emit('update:calibrationLines', newLines);
+          
+          // Réinitialiser l'état
+          this.isDraggingPoint = false;
+          this.draggedPoints = [];
+          this.tempPoint = null;
+          return;
+        }
+
+        if (!this.isCreatingLine) {
+          // Mode modification
+          const nearestPoint = this.findLineByPoint(x, y);
+          if (nearestPoint) {
+            this.isDraggingPoint = true;
+            const sharedLines = this.findAllLinesWithPoint(nearestPoint.point.x, nearestPoint.point.y);
+            this.draggedPoints = sharedLines.map(line => ({
+              lineId: line.lineId,
+              pointIndex: line.pointIndex
+            }));
+            this.tempPoint = { ...nearestPoint.point };
+            return;
+          } else if (this.selectedFieldLine) {
+            // Commencer une nouvelle ligne
+            this.isCreatingLine = true;
+            this.currentLinePoints = [{ x, y }];
+          }
+        } else {
+          // Mode création
+          if (this.isCtrlPressed) {
+            const nearestPoint = this.findLineByPoint(x, y);
+            if (nearestPoint && nearestPoint.lineId !== this.selectedFieldLine.id) {
+              this.currentLinePoints.push(nearestPoint.point);
+              this.sharedPoints.add(`${nearestPoint.lineId}-${nearestPoint.pointIndex}`);
+              return;
+            }
+          }
+          this.currentLinePoints.push({ x, y });
         }
       }
     },
     handleMouseMove(event) {
       if (this.isMiddleMouseDown) {
-        const deltaX = event.clientX - this.lastMousePosition.x;
-        const deltaY = event.clientY - this.lastMousePosition.y;
+        const dx = event.clientX - this.lastMousePosition.x;
+        const dy = event.clientY - this.lastMousePosition.y;
         
-        const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const containerWidth = rect.width;
-        const containerHeight = rect.height;
+        const container = this.$refs.imageContainer;
+        const image = this.$refs.image;
+        
+        if (!container || !image) return;
+        
+        const containerRect = container.getBoundingClientRect();
+        const imageRect = image.getBoundingClientRect();
         
         // Calculer les limites de translation
-        const scaledImageWidth = this.imageSize.width * this.scale;
-        const scaledImageHeight = this.imageSize.height * this.scale;
+        const minX = containerRect.width - imageRect.width * this.scale;
+        const minY = containerRect.height - imageRect.height * this.scale;
         
-        const minX = containerWidth - scaledImageWidth;
-        const minY = containerHeight - scaledImageHeight;
+        // Appliquer les limites
+        const newX = Math.min(0, Math.max(minX, this.translation.x + dx));
+        const newY = Math.min(0, Math.max(minY, this.translation.y + dy));
         
-        // Appliquer la translation avec les limites
-        const newX = Math.min(0, Math.max(minX, this.translation.x + deltaX));
-        const newY = Math.min(0, Math.max(minY, this.translation.y + deltaY));
+        this.translation.x = newX;
+        this.translation.y = newY;
         
-        this.translation = { x: newX, y: newY };
-        this.lastMousePosition = { x: event.clientX, y: event.clientY };
+        this.lastMousePosition = {
+          x: event.clientX,
+          y: event.clientY
+        };
         return;
       }
 
-      if (this.isDraggingPoint) {
+      if (this.isDraggingPoint && this.draggedPoints.length > 0) {
         const rect = this.$refs.imageContainer.getBoundingClientRect();
         const mouseX = event.clientX - rect.left;
         const mouseY = event.clientY - rect.top;
         
-        // Point dans l'image originale
         const x = (mouseX - this.translation.x) / this.scale;
         const y = (mouseY - this.translation.y) / this.scale;
 
-        // Mettre à jour la position temporaire
+        // Mettre à jour tous les points partagés
         const newLines = { ...this.calibrationLines };
-        newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
-        this.$emit('update:calibrationLines', newLines);
-      }
-
-      if (this.isWaitingForValidation) {
-        const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const x = (event.clientX - rect.left) / this.scale - this.translation.x;
-        const y = (event.clientY - rect.top) / this.scale - this.translation.y;
-
-        // Mettre à jour la position temporaire
-        const newLines = { ...this.calibrationLines };
-        newLines[this.draggedLineId].points[this.selectedPointIndex] = { x, y };
+        this.draggedPoints.forEach(({ lineId, pointIndex }) => {
+          if (newLines[lineId] && Array.isArray(newLines[lineId].points)) {
+            newLines[lineId].points[pointIndex] = { x, y };
+          }
+        });
+        
         this.$emit('update:calibrationLines', newLines);
       }
     },
     handleMouseUp(event) {
+      if (event.button === 1) {
+        this.isMiddleMouseDown = false;
+        return;
+      }
       if (this.isDraggingPoint) {
         const newLines = { ...this.calibrationLines };
         newLines[this.draggedLineId].points[this.selectedPointIndex] = this.tempPoint;
@@ -374,9 +405,6 @@ export default {
         this.selectedPointIndex = null;
         this.draggedLineId = null;
         this.tempPoint = null;
-      }
-      if (event.button === 1) {
-        this.isMiddleMouseDown = false;
       }
     },
     stopPan() {
@@ -455,19 +483,15 @@ export default {
       }
     },
     handleKeyDown(event) {
-      if (event.key === 'Delete') {
-        event.preventDefault();
-        if (this.selectedFieldPoint) {
-          const newPoints = { ...this.calibrationPoints };
-          delete newPoints[this.selectedFieldPoint.index];
-          this.$emit('update:calibrationPoints', newPoints);
-          this.$emit('update:selectedFieldPoint', null);
-        } else if (this.selectedFieldLine) {
-          const newLines = { ...this.calibrationLines };
-          delete newLines[this.selectedFieldLine.id];
-          this.$emit('update:calibrationLines', newLines);
-          this.$emit('update:selectedFieldLine', null);
-        }
+      if (event.key === 'Control') {
+        this.isCtrlPressed = true;
+      } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        this.deleteLine();
+      }
+    },
+    handleKeyUp(event) {
+      if (event.key === 'Control') {
+        this.isCtrlPressed = false;
       }
     },
     handleFocus() {
@@ -521,6 +545,71 @@ export default {
         }
       }
       return null;
+    },
+    findSharedPoint(x, y) {
+      for (const [lineId, line] of Object.entries(this.calibrationLines)) {
+        if (lineId === this.selectedFieldLine?.id) continue;
+        
+        const points = line.points;
+        for (let i = 0; i < points.length; i++) {
+          const point = points[i];
+          const dx = point.x - x;
+          const dy = point.y - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < this.proximityThreshold) {
+            return {
+              lineId,
+              pointIndex: i,
+              point
+            };
+          }
+        }
+      }
+      return null;
+    },
+    formatPoints(points) {
+      if (!points) return '';
+      return points.map(p => `${p.x},${p.y}`).join(' ');
+    },
+    findAllLinesWithPoint(x, y) {
+      const sharedLines = [];
+      for (const [lineId, line] of Object.entries(this.calibrationLines)) {
+        const points = line.points;
+        for (let i = 0; i < points.length; i++) {
+          const point = points[i];
+          const dx = point.x - x;
+          const dy = point.y - y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          
+          if (distance < this.proximityThreshold) {
+            sharedLines.push({
+              lineId,
+              pointIndex: i,
+              point
+            });
+          }
+        }
+      }
+      return sharedLines;
+    },
+    deleteLine() {
+      if (this.selectedFieldLine) {
+        const newLines = { ...this.calibrationLines };
+        // Supprimer les références aux points partagés
+        if (newLines[this.selectedFieldLine.id]) {
+          const points = newLines[this.selectedFieldLine.id].points;
+          points.forEach((_, index) => {
+            this.sharedPoints.delete(`${this.selectedFieldLine.id}-${index}`);
+          });
+        }
+        // Supprimer la ligne
+        delete newLines[this.selectedFieldLine.id];
+        this.$emit('update:calibrationLines', newLines);
+        this.$emit('update:selectedFieldLine', null);
+        this.currentLinePoints = [];
+        this.isCreatingLine = false;
+      }
     }
   }
 }
@@ -708,5 +797,33 @@ export default {
   width: 100%;
   height: 100%;
   pointer-events: none;
+}
+
+.polyline-point.shared-point {
+  fill: #FFC107;
+  stroke: #FF4081;
+  stroke-width: 2;
+  r: 5;
+  animation: pulse 2s infinite;
+}
+
+.polyline-point.hoverable {
+  cursor: pointer;
+  filter: brightness(1.2);
+}
+
+@keyframes pulse {
+  0% {
+    stroke-width: 2;
+    stroke-opacity: 1;
+  }
+  50% {
+    stroke-width: 3;
+    stroke-opacity: 0.5;
+  }
+  100% {
+    stroke-width: 2;
+    stroke-opacity: 1;
+  }
 }
 </style> 
