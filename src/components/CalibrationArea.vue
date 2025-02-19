@@ -9,6 +9,7 @@
     <div class="video-frame" 
          ref="imageContainer"
          :style="frameStyle"
+         @contextmenu.prevent
          @wheel.prevent="handleZoom"
          @mousedown="handleMouseDown"
          @mousemove="handleMouseMove"
@@ -32,14 +33,26 @@
         </div>
         <div v-for="(line, id) in calibrationLines"
              :key="'line-'+id"
-             class="calibration-line"
-             :style="{
-               left: `${line.start.x}px`,
-               top: `${line.start.y}px`,
-               width: `${Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y)}px`,
-               transform: `rotate(${Math.atan2(line.end.y - line.start.y, line.end.x - line.start.x)}rad)`
-             }" />
-        <div v-for="(point, index) in linePoints"
+             class="calibration-polyline">
+          <svg class="polyline-svg">
+            <polyline
+              :points="getPolylinePoints(line.points)"
+              :class="{ 'selected-line': selectedFieldLine && selectedFieldLine.id === id }"
+              stroke="#00FF15"
+              fill="none"
+              stroke-width="2"
+            />
+            <circle v-for="(point, index) in line.points"
+                    :key="'point-'+index"
+                    :cx="point.x"
+                    :cy="point.y"
+                    r="4"
+                    class="polyline-point"
+                    :class="{ 'selected-line-point': selectedFieldLine && selectedFieldLine.id === id }"
+            />
+          </svg>
+        </div>
+        <div v-for="(point, index) in currentLinePoints"
              :key="'temp-'+index"
              class="calibration-point temp-point"
              :style="{
@@ -103,6 +116,8 @@ export default {
       lastMousePosition: { x: 0, y: 0 },
       linePoints: [],
       placedLinePoints: [],
+      currentLinePoints: [],
+      isDrawingLine: false,
     }
   },
   computed: {
@@ -220,37 +235,35 @@ export default {
       this.$emit('update:selectedFieldPoint', pointData);
     },
     handleMouseDown(event) {
-      if (event.button === 1) {
+      if (event.button === 1) { // Clic molette
         this.isMiddleMouseDown = true;
         this.lastMousePosition = { x: event.clientX, y: event.clientY };
         return;
       }
 
-      if (event.button === 0) {
-        const rect = this.$refs.imageContainer.getBoundingClientRect();
-        const pointX = (event.clientX - rect.left - this.translation.x) / this.scale;
-        const pointY = (event.clientY - rect.top - this.translation.y) / this.scale;
+      const rect = this.$refs.imageContainer.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / this.scale - this.translation.x;
+      const y = (event.clientY - rect.top) / this.scale - this.translation.y;
 
-        if (this.selectedFieldLine) {
-          this.linePoints.push({ x: pointX, y: pointY });
-          
-          if (this.linePoints.length === 2) {
+      if (this.selectedFieldLine) {
+        // Gestion des polylines
+        if (event.button === 0) { // Clic gauche
+          this.currentLinePoints.push({ x, y });
+        } else if (event.button === 2) { // Clic droit
+          if (this.currentLinePoints.length >= 2) {
             const newLines = { ...this.calibrationLines };
             newLines[this.selectedFieldLine.id] = {
-              start: this.linePoints[0],
-              end: this.linePoints[1]
+              points: [...this.currentLinePoints]
             };
-            
             this.$emit('update:calibrationLines', newLines);
-            this.$emit('update:selectedFieldLine', null);
-            this.linePoints = [];
+            this.currentLinePoints = [];
           }
-        } else if (this.selectedFieldPoint) {
-          const newPoints = { ...this.calibrationPoints };
-          newPoints[this.selectedFieldPoint.index] = { x: pointX, y: pointY };
-          this.$emit('update:calibrationPoints', newPoints);
-          this.$emit('update:selectedFieldPoint', null);
         }
+      } else if (this.selectedFieldPoint && event.button === 0) {
+        // Gestion des keypoints simples
+        const newPoints = { ...this.calibrationPoints };
+        newPoints[this.selectedFieldPoint.index] = { x, y };
+        this.$emit('update:calibrationPoints', newPoints);
       }
     },
     handleMouseMove(event) {
@@ -358,12 +371,19 @@ export default {
       }
     },
     handleKeyDown(event) {
-      if (event.key === 'Delete' && this.selectedFieldPoint) {
+      if (event.key === 'Delete') {
         event.preventDefault();
-        const newPoints = { ...this.calibrationPoints };
-        delete newPoints[this.selectedFieldPoint.index];
-        this.$emit('update:calibrationPoints', newPoints);
-        this.$emit('update:selectedFieldPoint', null);
+        if (this.selectedFieldPoint) {
+          const newPoints = { ...this.calibrationPoints };
+          delete newPoints[this.selectedFieldPoint.index];
+          this.$emit('update:calibrationPoints', newPoints);
+          this.$emit('update:selectedFieldPoint', null);
+        } else if (this.selectedFieldLine) {
+          const newLines = { ...this.calibrationLines };
+          delete newLines[this.selectedFieldLine.id];
+          this.$emit('update:calibrationLines', newLines);
+          this.$emit('update:selectedFieldLine', null);
+        }
       }
     },
     handleFocus() {
@@ -393,6 +413,10 @@ export default {
     handleLineSelected(points) {
       this.linePoints = points;
       this.placedLinePoints = [];
+    },
+    getPolylinePoints(points) {
+      if (!points) return '';
+      return points.map(p => `${p.x},${p.y}`).join(' ');
     }
   }
 }
@@ -507,15 +531,51 @@ export default {
   font-size: 0.9rem;
 }
 
-.calibration-line {
+.calibration-polyline {
   position: absolute;
-  height: 2px;
-  background-color: #00FF15;
-  transform-origin: left center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
+}
+
+.polyline-svg {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.polyline-svg polyline {
+  transition: stroke-width 0.2s;
+}
+
+.selected-line {
+  stroke-width: 3;
+  stroke: #FFC107 !important;
+}
+
+.polyline-point {
+  fill: #00FF15;
+  stroke: white;
+  stroke-width: 1;
+  transition: all 0.2s ease;
+}
+
+.selected-line-point {
+  fill: #FFC107;
+  r: 5;
+  stroke-width: 2;
 }
 
 .temp-point {
   background-color: #FFC107;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 2px solid white;
+  z-index: 2;
 }
 </style> 

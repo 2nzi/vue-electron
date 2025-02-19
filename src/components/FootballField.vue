@@ -179,8 +179,7 @@ export default {
         this.$emit('line-selected', {
           id: lineName,
           name: this.LINES[lineName].name,
-          description: this.LINES[lineName].description,
-          coordinates: this.lineCoordinates[lineName]
+          description: this.LINES[lineName].description
         });
       }
     },
