@@ -20,19 +20,21 @@
         </div>
 
         <div class="video-display">
-          <CalibrationArea
-            :thumbnail="thumbnail"
-            :calibrationPoints="calibrationPoints"
-            :calibrationLines="calibrationLines"
-            :selectedFieldPoint="selectedFieldPoint"
-            :selectedFieldLine="selectedFieldLine"
-            @update:thumbnail="updateThumbnail"
-            @update:calibrationPoints="updateCalibrationPoints"
-            @update:calibrationLines="updateCalibrationLines"
-            @update:selectedFieldPoint="updateSelectedFieldPoint"
-            @update:selectedFieldLine="updateSelectedFieldLine"
-            @save-calibration="saveCalibration"
-          />
+          <div class="calibration-container">
+            <CalibrationArea
+              :thumbnail="thumbnail"
+              :calibrationPoints="calibrationPoints"
+              :calibrationLines="calibrationLines"
+              :selectedFieldPoint="selectedFieldPoint"
+              :selectedFieldLine="selectedFieldLine"
+              @update:thumbnail="updateThumbnail"
+              @update:calibrationPoints="updateCalibrationPoints"
+              @update:calibrationLines="updateCalibrationLines"
+              @update:selectedFieldPoint="updateSelectedFieldPoint"
+              @update:selectedFieldLine="updateSelectedFieldLine"
+              @save-calibration="saveCalibration"
+            />
+          </div>
           <div class="field-container">
             <FootballField 
               ref="footballField"
@@ -244,21 +246,25 @@ export default {
 .video-display {
   flex: 1;
   display: flex;
-  gap: 1rem;
-  align-items: stretch;
-  min-height: 0;
+  gap: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.calibration-container {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .field-container {
   flex: 1;
-  min-width: 300px;
-  max-width: 400px;
+  min-width: 0;
+  background-color: #1a1a1a;
   border-radius: 4px;
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
+  display: flex;
 }
 
 .field-container :deep(svg) {

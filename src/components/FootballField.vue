@@ -1,13 +1,12 @@
 <template>
   <div class="football-field">
-    <svg viewBox="0 0 105 68" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="-5 0 115 68" preserveAspectRatio="xMidYMid meet">
       <g>
         <!-- Terrain de base -->
-        <rect x="0" y="0" width="105" height="68" fill="none" stroke="#00FF15" stroke-width="0.3"/>
+        <rect x="0" y="0" width="105" height="68" fill="none" stroke="#333" stroke-width="0.3"/>
         
         <!-- Lignes cliquables -->
         <g class="lines">
-          <!-- Toutes les lignes avec la nouvelle méthode getLineColor -->
           <line v-for="(line, name) in lineCoordinates" 
                 :key="name"
                 class="field-line"
@@ -17,29 +16,6 @@
                 :x2="line.x2"
                 :y2="line.y2"
                 @click="selectLine(name)" />
-          
-          <!-- Buts -->
-          <line class="field-line" x1="11" y1="34" x2="16.5" y2="34" @click="selectLine(7)" />
-          <line class="field-line" x1="11" y1="30.34" x2="11" y2="37.66" @click="selectLine(8)" />
-          <line class="field-line" x1="16.5" y1="30.34" x2="16.5" y2="37.66" @click="selectLine(9)" />
-          <line class="field-line" x1="88.5" y1="34" x2="94" y2="34" @click="selectLine(10)" />
-          <line class="field-line" x1="88.5" y1="30.34" x2="88.5" y2="37.66" @click="selectLine(11)" />
-          <line class="field-line" x1="94" y1="30.34" x2="94" y2="37.66" @click="selectLine(12)" />
-          
-          <!-- Ligne médiane et lignes de touche -->
-          <line class="field-line" x1="52.5" y1="0" x2="52.5" y2="68" @click="selectLine(13)" />
-          <line class="field-line" x1="0" y1="0" x2="105" y2="0" @click="selectLine(14)" />
-          <line class="field-line" x1="0" y1="0" x2="0" y2="68" @click="selectLine(15)" />
-          <line class="field-line" x1="105" y1="0" x2="105" y2="68" @click="selectLine(16)" />
-          <line class="field-line" x1="0" y1="68" x2="105" y2="68" @click="selectLine(17)" />
-          
-          <!-- Petites surfaces -->
-          <line class="field-line" x1="0" y1="24.84" x2="5.5" y2="24.84" @click="selectLine(18)" />
-          <line class="field-line" x1="5.5" y1="24.84" x2="5.5" y2="43.16" @click="selectLine(19)" />
-          <line class="field-line" x1="0" y1="43.16" x2="5.5" y2="43.16" @click="selectLine(20)" />
-          <line class="field-line" x1="99.5" y1="24.84" x2="105" y2="24.84" @click="selectLine(21)" />
-          <line class="field-line" x1="99.5" y1="24.84" x2="99.5" y2="43.16" @click="selectLine(22)" />
-          <line class="field-line" x1="99.5" y1="43.16" x2="105" y2="43.16" @click="selectLine(23)" />
         </g>
 
         <!-- Points existants -->
@@ -54,46 +30,47 @@
       </g>
     </svg>
     
-    <!-- Info sur la ligne sélectionnée -->
-    <div v-if="selectedLine && LINES[selectedLine]" class="line-info">
+    <!-- Info sur la ligne ou le point sélectionné -->
+    <div v-if="selectedLine && LINES[selectedLine]" class="info-overlay">
       {{ LINES[selectedLine].name }}
+    </div>
+    <div v-if="selectedPointIndex !== null" class="info-overlay">
+      Point {{ selectedPointIndex }}: [{{ keypoints[selectedPointIndex][0] }}, {{ keypoints[selectedPointIndex][1] }}]
     </div>
   </div>
 </template>
 
 <script>
+// Définition exacte des classes de lignes comme dans SoccerNet
 const LINES = {
-  // Utilisation des noms standardisés de la classe SoccerPitch
-  'Side line top': { name: 'Side line top', description: 'Ligne de but' },
-  'Side line bottom': { name: 'Side line bottom', description: 'Ligne de but opposée' },
-  'Side line left': { name: 'Side line left', description: 'Ligne de touche gauche' },
-  'Side line right': { name: 'Side line right', description: 'Ligne de touche droite' },
-  'Middle line': { name: 'Middle line', description: 'Ligne médiane' },
-  
   'Big rect. left bottom': { name: 'Big rect. left bottom', description: 'Surface de réparation gauche - ligne basse' },
   'Big rect. left main': { name: 'Big rect. left main', description: 'Surface de réparation gauche - ligne parallèle' },
   'Big rect. left top': { name: 'Big rect. left top', description: 'Surface de réparation gauche - ligne haute' },
   'Big rect. right bottom': { name: 'Big rect. right bottom', description: 'Surface de réparation droite - ligne basse' },
   'Big rect. right main': { name: 'Big rect. right main', description: 'Surface de réparation droite - ligne parallèle' },
   'Big rect. right top': { name: 'Big rect. right top', description: 'Surface de réparation droite - ligne haute' },
-  
-  'Small rect. left bottom': { name: 'Small rect. left bottom', description: 'Petite surface gauche - ligne basse' },
-  'Small rect. left main': { name: 'Small rect. left main', description: 'Petite surface gauche - ligne parallèle' },
-  'Small rect. left top': { name: 'Small rect. left top', description: 'Petite surface gauche - ligne haute' },
-  'Small rect. right bottom': { name: 'Small rect. right bottom', description: 'Petite surface droite - ligne basse' },
-  'Small rect. right main': { name: 'Small rect. right main', description: 'Petite surface droite - ligne parallèle' },
-  'Small rect. right top': { name: 'Small rect. right top', description: 'Petite surface droite - ligne haute' },
-  
+  'Circle central': { name: 'Circle central', description: 'Cercle central' },
+  'Circle left': { name: 'Circle left', description: 'Arc gauche' },
+  'Circle right': { name: 'Circle right', description: 'Arc droit' },
   'Goal left crossbar': { name: 'Goal left crossbar', description: 'Barre transversale but gauche' },
   'Goal left post left': { name: 'Goal left post left', description: 'Poteau gauche but gauche' },
   'Goal left post right': { name: 'Goal left post right', description: 'Poteau droit but gauche' },
   'Goal right crossbar': { name: 'Goal right crossbar', description: 'Barre transversale but droit' },
   'Goal right post left': { name: 'Goal right post left', description: 'Poteau gauche but droit' },
   'Goal right post right': { name: 'Goal right post right', description: 'Poteau droit but droit' },
-  
-  'Circle central': { name: 'Circle central', description: 'Cercle central' },
-  'Circle left': { name: 'Circle left', description: 'Arc gauche' },
-  'Circle right': { name: 'Circle right', description: 'Arc droit' }
+  'Goal unknown': { name: 'Goal unknown', description: 'But non identifié' },
+  'Line unknown': { name: 'Line unknown', description: 'Ligne non identifiée' },
+  'Middle line': { name: 'Middle line', description: 'Ligne médiane' },
+  'Side line bottom': { name: 'Side line bottom', description: 'Ligne de but inférieure' },
+  'Side line left': { name: 'Side line left', description: 'Ligne de touche gauche' },
+  'Side line right': { name: 'Side line right', description: 'Ligne de touche droite' },
+  'Side line top': { name: 'Side line top', description: 'Ligne de but supérieure' },
+  'Small rect. left bottom': { name: 'Small rect. left bottom', description: 'Petite surface gauche - ligne basse' },
+  'Small rect. left main': { name: 'Small rect. left main', description: 'Petite surface gauche - ligne parallèle' },
+  'Small rect. left top': { name: 'Small rect. left top', description: 'Petite surface gauche - ligne haute' },
+  'Small rect. right bottom': { name: 'Small rect. right bottom', description: 'Petite surface droite - ligne basse' },
+  'Small rect. right main': { name: 'Small rect. right main', description: 'Petite surface droite - ligne parallèle' },
+  'Small rect. right top': { name: 'Small rect. right top', description: 'Petite surface droite - ligne haute' }
 };
 
 // Définition des dimensions standard d'un terrain de football
@@ -137,7 +114,18 @@ export default {
         [52.5, 24.85], [88.5, 26.68], [16.5, 41.31], [52.5, 43.15], [88.5, 41.31],
         [11., 34.], [16.5, 34.], [20.15, 34.],
         [43.35, 34.], [52.5, 34.], [61.5, 34.], [84.85, 34.],
-        [88.5, 34.], [94., 34.]
+        [88.5, 34.], [94., 34.],
+        // Points d'intersection but gauche
+        [0, 30.34],    // Connexion haut avec terrain
+        [0, 37.66],    // Connexion bas avec terrain
+        [-5, 30.34],   // Coin haut gauche
+        [-5, 37.66],   // Coin bas gauche
+        
+        // Points d'intersection but droit
+        [105, 30.34],  // Connexion haut avec terrain
+        [105, 37.66],  // Connexion bas avec terrain
+        [110, 30.34],  // Coin haut droit
+        [110, 37.66],  // Coin bas droit
       ],
       lineCoordinates: {
         'Side line top': { x1: 0, y1: 0, x2: 105, y2: 0 },
@@ -163,12 +151,12 @@ export default {
         'Small rect. right top': { x1: 99.5, y1: 24.84, x2: 105, y2: 24.84 },
         
         // Buts
-        'Goal left crossbar': { x1: 11, y1: 34, x2: 16.5, y2: 34 },
-        'Goal left post left': { x1: 11, y1: 30.34, x2: 11, y2: 37.66 },
-        'Goal left post right': { x1: 16.5, y1: 30.34, x2: 16.5, y2: 37.66 },
-        'Goal right crossbar': { x1: 88.5, y1: 34, x2: 94, y2: 34 },
-        'Goal right post left': { x1: 88.5, y1: 30.34, x2: 88.5, y2: 37.66 },
-        'Goal right post right': { x1: 94, y1: 30.34, x2: 94, y2: 37.66 }
+        'Goal left post left': { x1: -5, y1: 37.66, x2: 0, y2: 37.66 },
+        'Goal left crossbar': { x1: -5, y1: 30.34, x2: -5, y2: 37.66 },
+        'Goal left post right': { x1: -5, y1: 30.34, x2: 0, y2: 30.34 },
+        'Goal right post left': { x1: 105, y1: 30.34, x2: 110, y2: 30.34 },
+        'Goal right crossbar': { x1: 110, y1: 30.34, x2: 110, y2: 37.66 },
+        'Goal right post right': { x1: 105, y1: 37.66, x2: 110, y2: 37.66 },
       },
       lastSelected: null // 'point' ou 'line'
     }
@@ -221,13 +209,17 @@ export default {
 }
 
 .field-line {
-  stroke-width: 1;
+  stroke-width: 0.3;
   cursor: pointer;
-  transition: stroke-width 0.3s;
+}
+
+/* Style spécifique pour les lignes des buts */
+.field-line[class*="Goal"] {
+  stroke-width: 0.8;  /* Ligne plus épaisse pour les buts */
 }
 
 .field-line:hover {
-  stroke-width: 1.8;
+  stroke-width: 1.2;  /* Encore plus épais au survol */
   opacity: 0.8;
 }
 
@@ -250,5 +242,17 @@ export default {
 
 .keypoint:hover {
   filter: drop-shadow(0 0 4px rgba(255, 0, 0, 0.8));
+}
+
+.info-overlay {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 0.9rem;
 }
 </style>
