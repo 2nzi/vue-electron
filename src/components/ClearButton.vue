@@ -8,15 +8,15 @@
       <span class="clear-text">Effacer tout</span>
     </button>
 
-    <!-- Dialog de confirmation -->
+    <!-- Dialog de confirmation avec style néon -->
     <div v-if="showDialog" class="dialog-overlay" @click="closeDialog">
-      <div class="dialog-content" @click.stop>
-        <h3>Confirmation</h3>
-        <p>Êtes-vous sûr de vouloir effacer tous les points et lignes ?</p>
+      <div class="dialog-content neon-panel" @click.stop>
+        <h3 class="neon-title">Confirmation</h3>
+        <p class="dialog-message">Êtes-vous sûr de vouloir effacer tous les points et lignes ?</p>
         <p class="warning-text">Cette action est irréversible.</p>
         <div class="dialog-buttons">
-          <button class="cancel-btn" @click="closeDialog">Annuler</button>
-          <button class="confirm-btn" @click="confirmClear">Confirmer</button>
+          <button class="cancel-btn neon-btn-gray" @click="closeDialog">Annuler</button>
+          <button class="confirm-btn neon-btn-red" @click="confirmClear">Confirmer</button>
         </div>
       </div>
     </div>
@@ -94,64 +94,105 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.85);
   display: flex;
   justify-content: center;
   align-items: center;
   z-index: 1000;
+  backdrop-filter: blur(4px);
 }
 
-.dialog-content {
-  background-color: #2a2a2a;
+.neon-panel {
+  background-color: rgba(28, 28, 28, 0.95);
   padding: 2rem;
   border-radius: 8px;
-  min-width: 300px;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+  min-width: 400px;
+  box-shadow: 0 0 20px rgba(244, 67, 54, 0.2),
+              inset 0 0 15px rgba(244, 67, 54, 0.2);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  animation: neonPulse 2s infinite;
 }
 
-.dialog-content h3 {
-  margin-top: 0;
+.neon-title {
   color: #ffffff;
+  font-size: 1.5rem;
+  margin: 0 0 1.5rem 0;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5),
+               0 0 20px rgba(255, 255, 255, 0.3),
+               0 0 30px rgba(255, 255, 255, 0.1);
+}
+
+.dialog-message {
+  color: #ffffff;
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+  text-align: center;
 }
 
 .warning-text {
   color: #f44336;
   font-size: 0.9rem;
   margin-bottom: 1.5rem;
+  text-align: center;
+  text-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
 }
 
 .dialog-buttons {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 1rem;
-  margin-top: 1.5rem;
+  margin-top: 2rem;
 }
 
-.cancel-btn, .confirm-btn {
-  padding: 0.5rem 1rem;
+.neon-btn-gray {
+  background-color: transparent;
+  color: #ffffff;
+  border: 1px solid #666;
+  padding: 0.8rem 1.5rem;
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
 }
 
-.cancel-btn {
-  background-color: transparent;
-  border: 1px solid #666;
-  color: #ffffff;
-}
-
-.cancel-btn:hover {
+.neon-btn-gray:hover {
   background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2),
+              inset 0 0 15px rgba(255, 255, 255, 0.1);
 }
 
-.confirm-btn {
-  background-color: #f44336;
-  border: none;
-  color: white;
+.neon-btn-red {
+  background-color: rgba(244, 67, 54, 0.1);
+  color: #f44336;
+  border: 1px solid #f44336;
+  padding: 0.8rem 1.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
 }
 
-.confirm-btn:hover {
-  background-color: #d32f2f;
+.neon-btn-red:hover {
+  background-color: rgba(244, 67, 54, 0.2);
+  box-shadow: 0 0 15px rgba(244, 67, 54, 0.4),
+              inset 0 0 15px rgba(244, 67, 54, 0.2);
+}
+
+@keyframes neonPulse {
+  0% {
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.2),
+                inset 0 0 15px rgba(244, 67, 54, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(244, 67, 54, 0.3),
+                inset 0 0 20px rgba(244, 67, 54, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(244, 67, 54, 0.2),
+                inset 0 0 15px rgba(244, 67, 54, 0.2);
+  }
 }
 </style> 
