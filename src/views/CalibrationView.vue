@@ -154,22 +154,40 @@ export default {
       if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return;
 
       const fieldKeypoints = this.$refs.footballField.keypoints;
+      
+      // Créer un élément Image pour obtenir les dimensions
+      const img = new Image();
+      img.src = this.thumbnail;
+      
+      // Attendre que l'image soit chargée
+      await new Promise((resolve) => {
+        if (img.complete) {
+          resolve();
+        } else {
+          img.onload = resolve;
+        }
+      });
+
       const calibrationData = {
         metadata: {
           video_name: this.selectedVideo.name,
           video_path: this.selectedVideo.path,
           calibration_date: new Date().toISOString(),
-          total_keypoints: fieldKeypoints.length,
-          positioned_keypoints: Object.keys(this.calibrationPoints).length,
+          image_size: {
+            width: img.naturalWidth,
+            height: img.naturalHeight
+          }
         },
         keypoints: {},
-        lines: this.calibrationLines,
+        lines: {},
+        lines_normalized: {},
         field_dimensions: {
           width: 105,
           height: 68
         }
       };
 
+      // Traitement des points de calibration
       for (const [index, point] of Object.entries(this.calibrationPoints)) {
         calibrationData.keypoints[index] = {
           image_coordinates: {
@@ -181,6 +199,17 @@ export default {
             y: Math.round(fieldKeypoints[index][1] * 100) / 100
           }
         };
+      }
+
+      // Traitement des lignes
+      for (const [lineName, line] of Object.entries(this.calibrationLines)) {
+        calibrationData.lines[lineName] = line.points;
+        calibrationData.lines_normalized[lineName] = line.points.map(point => {
+          return {
+            x: point.x / img.naturalWidth,
+            y: point.y / img.naturalHeight
+          };
+        });
       }
 
       try {

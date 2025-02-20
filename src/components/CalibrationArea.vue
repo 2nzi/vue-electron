@@ -457,35 +457,84 @@ export default {
     stopPan() {
       this.isMiddleMouseDown = false;
     },
-    saveCalibration() {
-      const lineExport = {};
-      
-      // Pour chaque ligne calibrée
-      for (const [lineId, line] of Object.entries(this.calibrationLines)) {
-        // Ne garder que les coordonnées x,y des points
-        const points = line.points.map(point => ({
-          x: Math.round(point.x),
-          y: Math.round(point.y)
-        }));
-        
-        // Ajouter au dictionnaire final
-        lineExport[lineId] = points;
-      }
+    async saveCalibration() {
+      if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return;
 
-      // Vous pouvez maintenant utiliser lineExport qui aura le format souhaité
-      console.log(JSON.stringify(lineExport, null, 2));
-      
-      // Si vous voulez toujours sauvegarder les autres données
+      const fieldKeypoints = this.$refs.footballField.keypoints;
+      const imageSize = this.$refs.calibrationArea.imageSize;
+
       const calibrationData = {
         metadata: {
           video_name: this.selectedVideo.name,
           video_path: this.selectedVideo.path,
-          calibration_date: new Date().toISOString()
+          calibration_date: new Date().toISOString(),
+          image_size: {
+            width: imageSize.width,
+            height: imageSize.height
+          }
         },
-        lines: lineExport
+        keypoints: {},
+        lines: {},
+        lines_normalized: {},
+        field_dimensions: {
+          width: 105,
+          height: 68
+        }
       };
 
-      this.$emit('save-calibration', calibrationData);
+      // Traitement des points de calibration
+      for (const [index, point] of Object.entries(this.calibrationPoints)) {
+        calibrationData.keypoints[index] = {
+          image_coordinates: {
+            x: Math.round(point.x * 100) / 100,
+            y: Math.round(point.y * 100) / 100
+          },
+          field_coordinates: {
+            x: Math.round(fieldKeypoints[index][0] * 100) / 100,
+            y: Math.round(fieldKeypoints[index][1] * 100) / 100
+          }
+        };
+      }
+
+      // Traitement des lignes
+      for (const [lineName, line] of Object.entries(this.calibrationLines)) {
+        // Coordonnées en pixels
+        calibrationData.lines[lineName] = line.points.map(point => ({
+          x: Math.round(point.x * 100) / 100,
+          y: Math.round(point.y * 100) / 100
+        }));
+
+        // Coordonnées normalisées
+        calibrationData.lines_normalized[lineName] = line.points.map(point => ({
+          x: Math.round((point.x / imageSize.width) * 100) / 100,
+          y: Math.round((point.y / imageSize.height) * 100) / 100
+        }));
+      }
+
+      try {
+        const response = await fetch('http://localhost:8000/calibration/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            video_path: this.selectedVideo.path,
+            calibration_data: calibrationData
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Erreur lors de la sauvegarde');
+        }
+
+        const result = await response.json();
+        if (result.success) {
+          alert('Calibration sauvegardée avec succès !');
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde:', error);
+        alert('Erreur lors de la sauvegarde de la calibration');
+      }
     },
     handleKeyDown(event) {
       if (event.key === 'Control') {
