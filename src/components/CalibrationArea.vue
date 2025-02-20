@@ -78,12 +78,10 @@
       </div>
     </div>
     <div class="save-section">
-      <button 
-        class="clear-btn" 
-        @click="clearCalibration"
-        :disabled="Object.keys(calibrationLines).length === 0 && Object.keys(calibrationPoints).length === 0">
-        <span class="clear-text">Effacer tout</span>
-      </button>
+      <ClearButton 
+        :disabled="Object.keys(calibrationLines).length === 0 && Object.keys(calibrationPoints).length === 0"
+        @clear="clearCalibration"
+      />
       <button 
         class="save-btn" 
         @click="$emit('save-calibration')"
@@ -95,8 +93,13 @@
 </template>
 
 <script>
+import ClearButton from './ClearButton.vue';
+
 export default {
   name: 'CalibrationArea',
+  components: {
+    ClearButton
+  },
   props: {
     thumbnail: {
       type: String,
