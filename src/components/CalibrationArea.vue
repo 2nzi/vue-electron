@@ -79,6 +79,12 @@
     </div>
     <div class="save-section">
       <button 
+        class="clear-btn" 
+        @click="clearCalibration"
+        :disabled="Object.keys(calibrationLines).length === 0 && Object.keys(calibrationPoints).length === 0">
+        <span class="clear-text">Effacer tout</span>
+      </button>
+      <button 
         class="save-btn" 
         @click="$emit('save-calibration')"
         :disabled="Object.keys(calibrationLines).length === 0">
@@ -692,6 +698,15 @@ export default {
         }
       }
       return intersections;
+    },
+    clearCalibration() {
+      this.$emit('update:calibrationPoints', {});
+      this.$emit('update:calibrationLines', {});
+      this.$emit('update:selectedFieldPoint', null);
+      this.$emit('update:selectedFieldLine', null);
+      this.currentLinePoints = [];
+      this.isCreatingLine = false;
+      this.sharedPoints.clear();
     }
   }
 }
@@ -755,6 +770,43 @@ export default {
   position: absolute;
   bottom: 10px;
   left: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.clear-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  border: 1px solid #f44336;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+  margin-right: 10px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 10px rgba(244, 67, 54, 0.3),
+              inset 0 0 10px rgba(244, 67, 54, 0.2);
+}
+
+.clear-btn:hover:not(:disabled) {
+  background-color: rgba(244, 67, 54, 0.15);
+  border-color: #f44336;
+  box-shadow: 0 0 15px rgba(244, 67, 54, 0.4),
+              inset 0 0 15px rgba(244, 67, 54, 0.3);
+}
+
+.clear-btn:active:not(:disabled) {
+  background-color: rgba(244, 67, 54, 0.2);
+  box-shadow: 0 0 8px rgba(244, 67, 54, 0.3),
+              inset 0 0 8px rgba(244, 67, 54, 0.2);
+}
+
+.clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .save-btn {
