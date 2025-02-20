@@ -47,7 +47,7 @@
                       :key="'point-'+index"
                       :cx="point.x"
                       :cy="point.y"
-                      r="4"
+                      r="3"
                       class="polyline-point"
                       :class="{
                         'selected-line-point': selectedFieldLine && selectedFieldLine.id === id,
@@ -890,7 +890,7 @@ export default {
 .polyline-point {
   fill: #00FF15;
   stroke: white;
-  stroke-width: 1;
+  stroke-width: 0.5;
   transition: all 0.2s ease;
   pointer-events: all;
   cursor: pointer;
