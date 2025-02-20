@@ -38,15 +38,6 @@
           class="field-line"
           @click="selectLine('center_circle')" />
           
-        <!-- Arcs de cercle des corners -->
-        <path 
-          v-for="corner in corners" 
-          :key="'corner-'+corner.position"
-          :d="getCornerArc(corner)"
-          fill="none"
-          :stroke="getLineColor('corner_arc')"
-          class="field-line"
-          @click="selectLine('corner_arc')" />
         
         <!-- Arcs des surfaces de réparation -->
         <path 
@@ -104,11 +95,6 @@ const LINES = {
   center_circle: {
     name: "Cercle central",
     type: "circle",
-    color: "#00FF15"
-  },
-  corner_arc: {
-    name: "Arc de corner",
-    type: "arc",
     color: "#00FF15"
   },
   penalty_arc_left: {
@@ -199,12 +185,6 @@ export default {
         'Goal right post right': { x1: 105, y1: 37.66, x2: 110, y2: 37.66 },
       },
       lastSelected: null, // 'point' ou 'line'
-      corners: [
-        { x: 0, y: 0, position: 'top-left' },
-        { x: 105, y: 0, position: 'top-right' },
-        { x: 0, y: 68, position: 'bottom-left' },
-        { x: 105, y: 68, position: 'bottom-right' }
-      ],
       penaltyArcs: [
         { x: 11, y: 34, side: 'left' },
         { x: 94, y: 34, side: 'right' }
@@ -265,22 +245,7 @@ export default {
         return this.positionedLines[lineName] ? '#FFFF00' : 'red';
       }
       return this.positionedLines[lineName] ? '#00FF15' : 'white';
-    },
-    getCornerArc(corner) {
-      const radius = 1;
-      const largeArc = 0;
-      const sweep = 1;
-      
-      if (corner.x === 0 && corner.y === 0) {
-        return `M ${corner.x} ${corner.y + radius} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x + radius} ${corner.y}`;
-      } else if (corner.x === 105 && corner.y === 0) {
-        return `M ${corner.x - radius} ${corner.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x} ${corner.y + radius}`;
-      } else if (corner.x === 0 && corner.y === 68) {
-        return `M ${corner.x + radius} ${corner.y} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x} ${corner.y - radius}`;
-      } else {
-        return `M ${corner.x} ${corner.y - radius} A ${radius} ${radius} 0 ${largeArc} ${sweep} ${corner.x - radius} ${corner.y}`;
-      }
-    },
+    },  
     
     getPenaltyArc(arc) {
       const radius = 9.15;
