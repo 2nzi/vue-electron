@@ -47,7 +47,7 @@
                       :key="'point-'+index"
                       :cx="point.x"
                       :cy="point.y"
-                      r="3"
+                      r="2"
                       class="polyline-point"
                       :class="{
                         'selected-line-point': selectedFieldLine && selectedFieldLine.id === id,
@@ -883,7 +883,7 @@ export default {
 }
 
 .selected-line {
-  stroke-width: 3;
+  stroke-width: 2;
   stroke: #FFC107 !important;
 }
 
@@ -898,7 +898,7 @@ export default {
 
 .polyline-point:hover {
   fill: #FFC107;
-  r: 6;
+  r: 3;
   stroke-width: 2;
 }
 
@@ -908,14 +908,14 @@ export default {
 
 .polyline-point.dragging {
   fill: #FF4081;
-  r: 7;
+  r: 4;
   stroke-width: 3;
 }
 
 .selected-line-point {
   fill: #FFC107;
-  r: 5;
-  stroke-width: 2;
+  r: 2;
+  stroke-width: 1;
 }
 
 .temp-point {
@@ -940,7 +940,7 @@ export default {
   fill: #FFC107;
   stroke: #FF4081;
   stroke-width: 2;
-  r: 5;
+  r: 4;
   animation: pulse 2s infinite;
 }
 

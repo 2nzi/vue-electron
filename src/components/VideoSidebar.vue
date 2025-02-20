@@ -54,7 +54,7 @@ export default {
 }
 
 .sidebar-hidden {
-  width: 40px;
+  width: 80px;
   border-right: 1px solid rgba(76, 175, 80, 0.5);
   box-shadow: inset -2px 0 10px rgba(76, 175, 80, 0.2);
 }
