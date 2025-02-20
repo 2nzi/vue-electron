@@ -1,6 +1,6 @@
 <template>
   <div class="football-field">
-    <svg viewBox="-5 0 115 68" preserveAspectRatio="xMidYMid meet">
+    <svg viewBox="-7 -2 119 72" preserveAspectRatio="xMidYMid meet" @click="handleBackgroundClick">
       <g>
         <!-- Terrain de base -->
         <rect x="0" y="0" width="105" height="68" fill="none" stroke="#333" stroke-width="0.3"/>
@@ -18,16 +18,16 @@
                 @click="selectLine(name)" />
         </g>
 
-        <!-- Points existants -->
+        <!-- Points importants -->
         <circle v-for="(point, index) in keypoints" 
                 :key="index"
                 :cx="point[0]" 
                 :cy="point[1]" 
-                r="1.5"
+                r="2"
                 :fill="getPointColor(index)"
                 class="keypoint"
                 @click="selectPoint(index)" />
-
+        
         <!-- Cercle central -->
         <circle 
           cx="52.5" 
@@ -65,7 +65,7 @@
       {{ LINES[selectedLine].name }}
     </div>
     <div v-if="selectedPointIndex !== null" class="info-overlay">
-      Point {{ selectedPointIndex }}: [{{ keypoints[selectedPointIndex][0] }}, {{ keypoints[selectedPointIndex][1] }}]
+      {{ POINTS[selectedPointIndex].name }}
     </div>
   </div>
 </template>
@@ -137,6 +137,12 @@ const FIELD_DIMENSIONS = {
   GOAL_LENGTH: 7.32
 };
 
+const POINTS = {
+  0: { name: "Point central" },
+  1: { name: "Point de penalty gauche" },
+  2: { name: "Point de penalty droit" }
+};
+
 export default {
   name: 'FootballField',
   props: {
@@ -155,27 +161,11 @@ export default {
       selectedLine: null,
       LINES,
       FIELD_DIMENSIONS,
+      POINTS,
       keypoints: [
-        [0., 0.], [52.5, 0.], [105., 0.], [0., 13.84], [16.5, 13.84], [88.5, 13.84], [105., 13.84],
-        [0., 24.84], [5.5, 24.84], [99.5, 24.84], [105., 24.84], [0., 30.34], [0., 30.34],
-        [105., 30.34], [105., 30.34], [0., 37.66], [0., 37.66], [105., 37.66], [105., 37.66],
-        [0., 43.16], [5.5, 43.16], [99.5, 43.16], [105., 43.16], [0., 54.16], [16.5, 54.16],
-        [88.5, 54.16], [105., 54.16], [0., 68.], [52.5, 68.], [105., 68.], [16.5, 26.68],
-        [52.5, 24.85], [88.5, 26.68], [16.5, 41.31], [52.5, 43.15], [88.5, 41.31],
-        [11., 34.], [16.5, 34.], [20.15, 34.],
-        [43.35, 34.], [52.5, 34.], [61.5, 34.], [84.85, 34.],
-        [88.5, 34.], [94., 34.],
-        // Points d'intersection but gauche
-        [0, 30.34],    // Connexion haut avec terrain
-        [0, 37.66],    // Connexion bas avec terrain
-        [-5, 30.34],   // Coin haut gauche
-        [-5, 37.66],   // Coin bas gauche
-        
-        // Points d'intersection but droit
-        [105, 30.34],  // Connexion haut avec terrain
-        [105, 37.66],  // Connexion bas avec terrain
-        [110, 30.34],  // Coin haut droit
-        [110, 37.66],  // Coin bas droit
+        [52.5, 34],    // Point central
+        [11, 34],      // Point de penalty gauche
+        [94, 34],      // Point de penalty droit
       ],
       lineCoordinates: {
         'Side line top': { x1: 0, y1: 0, x2: 105, y2: 0 },
@@ -222,16 +212,37 @@ export default {
     }
   },
   methods: {
-    selectPoint(index) {
+    handleBackgroundClick(event) {
+      // Vérifie si le clic vient directement du SVG (pas d'un enfant)
+      if (event.target.tagName === 'svg') {
+        if (this.selectedPointIndex !== null) {
+          this.selectedPointIndex = null;
+          this.$emit('point-selected', null);
+        }
+        if (this.selectedLine) {
+          this.selectedLine = null;
+          this.$emit('line-selected', null);
+        }
+        this.lastSelected = null;
+      }
+    },
+    selectPoint(index, event) {
+      if (event) {
+        event.stopPropagation();
+      }
       if (this.selectedLine) this.selectedLine = null;
       this.selectedPointIndex = index;
       this.lastSelected = 'point';
       this.$emit('point-selected', {
         index,
-        coordinates: this.keypoints[index]
+        coordinates: this.keypoints[index],
+        name: this.POINTS[index].name
       });
     },
-    selectLine(lineName) {
+    selectLine(lineName, event) {
+      if (event) {
+        event.stopPropagation();
+      }
       if (this.selectedPointIndex !== null) this.selectedPointIndex = null;
       this.selectedLine = lineName;
       this.lastSelected = 'line';
@@ -304,13 +315,13 @@ export default {
 }
 
 .field-line {
-  stroke-width: 0.3;
+  stroke-width: 0.8;
   cursor: pointer;
 }
 
 /* Style spécifique pour les lignes des buts */
 .field-line[class*="Goal"] {
-  stroke-width: 0.8;  /* Ligne plus épaisse pour les buts */
+  stroke-width: 1;  /* Ligne plus épaisse pour les buts */
 }
 
 .field-line:hover {

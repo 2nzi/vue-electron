@@ -276,9 +276,27 @@ export default {
           x: event.clientX,
           y: event.clientY
         };
-        event.preventDefault(); // Empêche le comportement par défaut du navigateur
+        event.preventDefault();
         return;
       }
+
+      // Ajout de la gestion des points
+      if (event.button === 0 && this.selectedFieldPoint) { // Clic gauche avec un point sélectionné
+        const rect = this.$refs.imageContainer.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        
+        // Créer ou mettre à jour le point
+        const newPoints = { ...this.calibrationPoints };
+        newPoints[this.selectedFieldPoint.index] = {
+          x: (x - this.translation.x) / this.scale,
+          y: (y - this.translation.y) / this.scale
+        };
+        this.$emit('update:calibrationPoints', newPoints);
+        return;
+      }
+
+      // Gestion existante des lignes
       if (event.button === 2 && this.selectedFieldLine) { // Clic droit
         if (this.currentLinePoints.length >= 2) {
           // Créer ou mettre à jour la ligne
