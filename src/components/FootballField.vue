@@ -34,20 +34,20 @@
           cy="34" 
           r="9.15" 
           fill="none" 
-          :stroke="getLineColor('center_circle')"
+          :stroke="getLineColor('Circle central')"
           class="field-line"
-          @click="selectLine('center_circle')" />
+          @click="selectLine('Circle central')" />
           
         
         <!-- Arcs des surfaces de réparation -->
         <path 
-          v-for="arc in penaltyArcs" 
-          :key="'penalty-arc-'+arc.side"
+          v-for="arc in circle_left_right" 
+          :key="'Circle ' + arc.side"
           :d="getPenaltyArc(arc)"
           fill="none"
-          :stroke="getLineColor('penalty_arc_' + arc.side)"
+          :stroke="getLineColor('Circle ' + arc.side)"
           class="field-line"
-          @click="selectLine('penalty_arc_' + arc.side)" />
+          @click="selectLine('Circle ' + arc.side)" />
       </g>
     </svg>
     
@@ -97,13 +97,13 @@ const LINES = {
     type: "circle",
     color: "#00FF15"
   },
-  penalty_arc_left: {
-    name: "Arc de réparation gauche",
+  circle_left: {
+    name: "Circle left",
     type: "arc",
     color: "#00FF15"
   },
-  penalty_arc_right: {
-    name: "Arc de réparation droit",
+  circle_right: {
+    name: "Circle right",
     type: "arc",
     color: "#00FF15"
   }
@@ -185,7 +185,7 @@ export default {
         'Goal right post right': { x1: 105, y1: 37.66, x2: 110, y2: 37.66 },
       },
       lastSelected: null, // 'point' ou 'line'
-      penaltyArcs: [
+      circle_left_right: [
         { x: 11, y: 34, side: 'left' },
         { x: 94, y: 34, side: 'right' }
       ]
