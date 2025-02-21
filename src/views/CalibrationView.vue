@@ -155,18 +155,10 @@ export default {
 
       const fieldKeypoints = this.$refs.footballField.keypoints;
       
-      // Créer un élément Image pour obtenir les dimensions
-      const img = new Image();
-      img.src = this.thumbnail;
-      
-      // Attendre que l'image soit chargée
-      await new Promise((resolve) => {
-        if (img.complete) {
-          resolve();
-        } else {
-          img.onload = resolve;
-        }
-      });
+      // Récupérer les dimensions du conteneur depuis CalibrationArea
+      const imageContainer = document.querySelector('.video-frame');
+      const containerWidth = imageContainer.clientWidth;
+      const containerHeight = imageContainer.clientHeight;
 
       const calibrationData = {
         metadata: {
@@ -174,8 +166,8 @@ export default {
           video_path: this.selectedVideo.path,
           calibration_date: new Date().toISOString(),
           image_size: {
-            width: img.naturalWidth,
-            height: img.naturalHeight
+            width: containerWidth,
+            height: containerHeight
           }
         },
         keypoints: {},
@@ -206,8 +198,8 @@ export default {
         calibrationData.lines[lineName] = line.points;
         calibrationData.lines_normalized[lineName] = line.points.map(point => {
           return {
-            x: point.x / img.naturalWidth,
-            y: point.y / img.naturalHeight
+            x: point.x / containerWidth,
+            y: point.y / containerHeight
           };
         });
       }
