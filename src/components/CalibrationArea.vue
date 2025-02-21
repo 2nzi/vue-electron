@@ -275,6 +275,16 @@ export default {
 
       }
     },
+    getNormalizedCoordinates(x, y) {
+      const container = this.$refs.imageContainer;
+      if (!container) return { x: 0, y: 0 };
+      
+      const containerRect = container.getBoundingClientRect();
+      return {
+        x: x / containerRect.width,
+        y: y / containerRect.height
+      };
+    },
     handleFieldPointSelected(pointData) {
       this.$emit('update:selectedFieldPoint', pointData);
     },
@@ -313,6 +323,9 @@ export default {
           newLines[this.selectedFieldLine.id] = {
             points: [...this.currentLinePoints]
           };
+          const normalizedPoints = this.currentLinePoints.map(p => this.getNormalizedCoordinates(p.x, p.y));
+          console.log('Points de la ligne sauvegardée:', this.currentLinePoints);
+          console.log('Points normalisés de la ligne:', normalizedPoints);
           this.$emit('update:calibrationLines', newLines);
           this.currentLinePoints = []; // Réinitialiser les points temporaires
           this.isCreatingLine = false; // Sortir du mode création
@@ -334,6 +347,9 @@ export default {
           this.draggedPoints.forEach(({ lineId, pointIndex }) => {
             if (newLines[lineId] && Array.isArray(newLines[lineId].points)) {
               newLines[lineId].points[pointIndex] = { x, y };
+              const normalized = this.getNormalizedCoordinates(x, y);
+              console.log(`Point modifié - Ligne ${lineId}, Point ${pointIndex}:`, { x, y });
+              console.log(`Point modifié (normalisé) - Ligne ${lineId}, Point ${pointIndex}:`, normalized);
             }
           });
           this.$emit('update:calibrationLines', newLines);
@@ -357,10 +373,16 @@ export default {
                 this.isCreatingLine = true;
                 if (nearestPoint) {
                   this.currentLinePoints.push(nearestPoint.point);
+                  const normalized = this.getNormalizedCoordinates(nearestPoint.point.x, nearestPoint.point.y);
+                  console.log('Point d\'intersection ajouté:', nearestPoint.point);
+                  console.log('Point d\'intersection ajouté (normalisé):', normalized);
                   this.sharedPoints.add(`${nearestPoint.lineId}-${nearestPoint.pointIndex}`);
                 } else {
                   // Gérer plusieurs intersections possibles
                   this.currentLinePoints.push(circleIntersections[0].point);
+                  const normalized = this.getNormalizedCoordinates(circleIntersections[0].point.x, circleIntersections[0].point.y);
+                  console.log('Point d\'intersection de cercle ajouté:', circleIntersections[0].point);
+                  console.log('Point d\'intersection de cercle ajouté (normalisé):', normalized);
                   this.sharedPoints.add(`${circleIntersections[0].lineId}-intersection`);
                 }
                 return;
@@ -382,6 +404,9 @@ export default {
             // Commencer une nouvelle ligne
             this.isCreatingLine = true;
             this.currentLinePoints = [{ x, y }];
+            const normalized = this.getNormalizedCoordinates(x, y);
+            console.log('Premier point de la nouvelle ligne:', { x, y });
+            console.log('Premier point de la nouvelle ligne (normalisé):', normalized);
           }
         } else {
           // Mode création
@@ -389,11 +414,17 @@ export default {
             const nearestPoint = this.findLineByPoint(x, y);
             if (nearestPoint && nearestPoint.lineId !== this.selectedFieldLine.id) {
               this.currentLinePoints.push(nearestPoint.point);
+              const normalized = this.getNormalizedCoordinates(nearestPoint.point.x, nearestPoint.point.y);
+              console.log('Point partagé ajouté:', nearestPoint.point);
+              console.log('Point partagé ajouté (normalisé):', normalized);
               this.sharedPoints.add(`${nearestPoint.lineId}-${nearestPoint.pointIndex}`);
               return;
             }
           }
           this.currentLinePoints.push({ x, y });
+          const normalized = this.getNormalizedCoordinates(x, y);
+          console.log('Point ajouté à la ligne:', { x, y });
+          console.log('Point ajouté à la ligne (normalisé):', normalized);
         }
       }
     },
@@ -441,6 +472,9 @@ export default {
         this.draggedPoints.forEach(({ lineId, pointIndex }) => {
           if (newLines[lineId] && Array.isArray(newLines[lineId].points)) {
             newLines[lineId].points[pointIndex] = { x, y };
+            const normalized = this.getNormalizedCoordinates(x, y);
+            console.log(`Point en cours de déplacement - Ligne ${lineId}, Point ${pointIndex}:`, { x, y });
+            console.log(`Point en cours de déplacement (normalisé) - Ligne ${lineId}, Point ${pointIndex}:`, normalized);
           }
         });
         
