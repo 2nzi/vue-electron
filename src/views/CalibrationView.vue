@@ -22,6 +22,7 @@
         <div class="video-display">
           <div class="calibration-container">
             <CalibrationArea
+              ref="calibrationArea"
               :thumbnail="thumbnail"
               :calibrationPoints="calibrationPoints"
               :calibrationLines="calibrationLines"
@@ -155,8 +156,19 @@ export default {
 
       const fieldKeypoints = this.$refs.footballField.keypoints;
       
-      // Récupérer les dimensions du conteneur depuis CalibrationArea
+      // Ensure calibrationArea is defined
+      if (!this.$refs.calibrationArea) {
+        console.error('CalibrationArea component is not mounted.');
+        return;
+      }
+
+      // Retrieve dimensions from CalibrationArea
       const imageContainer = document.querySelector('.video-frame');
+      const imageSize = this.$refs.calibrationArea.imageSize;
+      if (!imageSize) {
+        console.error('Image size is not available.');
+        return;
+      }
       const containerWidth = imageContainer.clientWidth;
       const containerHeight = imageContainer.clientHeight;
 
@@ -166,8 +178,8 @@ export default {
           video_path: this.selectedVideo.path,
           calibration_date: new Date().toISOString(),
           image_size: {
-            width: containerWidth,
-            height: containerHeight
+            width: imageSize.width,
+            height: imageSize.height
           }
         },
         keypoints: {},
@@ -195,7 +207,13 @@ export default {
 
       // Traitement des lignes
       for (const [lineName, line] of Object.entries(this.calibrationLines)) {
-        calibrationData.lines[lineName] = line.points;
+        calibrationData.lines[lineName] = line.points.map(point => {
+          return {
+            x: point.x / containerWidth * imageSize.width,
+            y: point.y / containerHeight * imageSize.height
+          };
+        });
+        
         calibrationData.lines_normalized[lineName] = line.points.map(point => {
           return {
             x: point.x / containerWidth,

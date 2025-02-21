@@ -710,7 +710,7 @@ export default {
   position: absolute;
   width: 12px;
   height: 12px;
-  background-color: #4CAF50;
+  background-color: rgb(0, 255, 21);
   border-radius: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
@@ -773,7 +773,7 @@ export default {
   padding: 0.5rem 1rem;
   background-color: rgba(255, 255, 255, 0.1);
   color: #ffffff;
-  border: 1px solid #4CAF50;
+  border: 1px solid rgb(0, 255, 21);
   border-radius: 4px;
   cursor: pointer;
   font-size: 0.9rem;
@@ -785,7 +785,7 @@ export default {
 
 .save-btn:hover:not(:disabled) {
   background-color: rgba(76, 175, 80, 0.15);
-  border-color: #4CAF50;
+  border-color: rgb(0, 255, 21);
   box-shadow: 0 0 15px rgba(76, 175, 80, 0.4),
               inset 0 0 15px rgba(76, 175, 80, 0.3);
 }
