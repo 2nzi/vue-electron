@@ -21,3 +21,6 @@ export default {
   -moz-osx-font-smoothing: grayscale;
 }
 </style>
+
+
+<!-- npm run electron:serves -->
