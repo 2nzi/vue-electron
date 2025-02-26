@@ -27,14 +27,14 @@ contextBridge.exposeInMainWorld('electron', {
   },
   getFirstFrame: async (videoPath) => {
     try {
-      const response = await fetch(`http://localhost:8000/video/first-frame?video_path=${encodeURIComponent(videoPath)}`);
-      if (!response.ok) {
-        throw new Error('Erreur lors de la récupération de la frame');
-      }
-      const data = await response.json();
-      return data.data; // Retourne l'image en base64
+      const response = await ipcRenderer.invoke('fastapi:request', {
+        endpoint: '/video/first-frame',
+        method: 'GET',
+        params: { video_path: videoPath }
+      });
+      return response.data; // Retourne l'image en base64
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors de la récupération de la frame:', error);
       throw error;
     }
   },

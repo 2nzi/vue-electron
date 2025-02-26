@@ -7,8 +7,10 @@ import * as remote from '@electron/remote/main'
 import path from 'path'
 import fs from 'fs'
 const yaml = require('js-yaml')
+import fetch from 'node-fetch'
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
+const FASTAPI_URL = 'http://localhost:8000'
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
@@ -139,6 +141,35 @@ ipcMain.handle('calibration:save', async (_, data) => {
     return { success: true }
   } catch (error) {
     console.error('Erreur lors de la sauvegarde:', error)
+    throw error
+  }
+})
+
+// Ajouter le gestionnaire pour les requêtes FastAPI
+ipcMain.handle('fastapi:request', async (_, { endpoint, method = 'GET', params = {} }) => {
+  try {
+    let url = `${FASTAPI_URL}${endpoint}`
+    if (method === 'GET' && Object.keys(params).length > 0) {
+      const queryParams = new URLSearchParams(params)
+      url += `?${queryParams.toString()}`
+    }
+
+    const response = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: method !== 'GET' ? JSON.stringify(params) : undefined,
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data
+  } catch (error) {
+    console.error('FastAPI request error:', error)
     throw error
   }
 })
