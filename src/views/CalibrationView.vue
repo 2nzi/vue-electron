@@ -21,6 +21,20 @@
 
         <div class="video-display">
           <div class="calibration-container">
+            <video 
+              v-if="selectedVideo"
+              ref="videoPlayer"
+              :src="videoSrc"
+              style="display: none;"
+              @loadeddata="onVideoLoaded"
+              @error="onVideoError"
+              @loadstart="onVideoLoadStart"
+              @waiting="onVideoWaiting"
+              controls
+              preload="metadata"
+              crossorigin="anonymous"
+              type="video/mp4; codecs='avc1.42E01E, mp4a.40.2'"
+            ></video>
             <CalibrationArea
               ref="calibrationArea"
               :thumbnail="thumbnail"
@@ -78,7 +92,8 @@ export default {
       calibrationPoints: {},
       selectedFieldPoint: null,
       calibrationLines: {},
-      selectedFieldLine: null
+      selectedFieldLine: null,
+      videoSrc: ''
     }
   },
   async created() {
@@ -99,19 +114,77 @@ export default {
     },
 
     async selectVideo(video) {
-      this.selectedVideo = video
-      this.thumbnail = null
+      console.log('Début de selectVideo avec:', video)
       try {
-        const response = await fetch(`http://localhost:8000/video/first-frame?video_path=${encodeURIComponent(video.path)}`);
-        if (!response.ok) {
-          throw new Error('Erreur lors de la récupération de la frame');
+        this.selectedVideo = video
+        this.thumbnail = null
+        
+        console.log('Extraction de la première frame de la vidéo:', video.path)
+        const result = await window.electron.getFirstFrame(video.path)
+        
+        if (result.success) {
+          console.log('Frame extraite avec succès')
+          this.thumbnail = result.data
+        } else {
+          throw new Error('Échec de l\'extraction de la frame')
         }
-        const data = await response.json();
-        this.thumbnail = data.data;
       } catch (error) {
-        console.error('Erreur lors du chargement de la première frame:', error);
-        this.thumbnail = null;
+        console.error('Erreur détaillée dans selectVideo:', error)
+        this.thumbnail = null
       }
+    },
+
+    onVideoLoaded() {
+      console.log('Début de onVideoLoaded')
+      try {
+        const video = this.$refs.videoPlayer
+        console.log('Dimensions de la vidéo:', {
+          width: video.videoWidth,
+          height: video.videoHeight,
+          duration: video.duration,
+          readyState: video.readyState
+        })
+
+        // Créer un canvas pour capturer la première frame
+        console.log('Création du canvas...')
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        
+        // Dessiner la première frame
+        console.log('Dessin de la frame sur le canvas...')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        
+        // Convertir en base64
+        console.log('Conversion en base64...')
+        this.thumbnail = canvas.toDataURL('image/jpeg', 0.85)
+        console.log('Thumbnail créé avec succès')
+      } catch (error) {
+        console.error('Erreur détaillée dans onVideoLoaded:', error)
+        console.error('État de la vidéo:', {
+          videoRef: !!this.$refs.videoPlayer,
+          videoSrc: this.videoSrc,
+          selectedVideo: this.selectedVideo
+        })
+      }
+    },
+
+    onVideoError(error) {
+      console.error('Erreur de chargement de la vidéo:', {
+        error: error,
+        videoElement: this.$refs.videoPlayer,
+        errorCode: this.$refs.videoPlayer?.error?.code,
+        errorMessage: this.$refs.videoPlayer?.error?.message
+      })
+    },
+
+    onVideoLoadStart() {
+      console.log('Début du chargement de la vidéo')
+    },
+
+    onVideoWaiting() {
+      console.log('Vidéo en attente de données')
     },
 
     toggleSidebar() {
@@ -119,58 +192,56 @@ export default {
     },
 
     handleFieldPointSelected(pointData) {
-      this.selectedFieldLine = null;
-      this.selectedFieldPoint = pointData;
+      this.selectedFieldLine = null
+      this.selectedFieldPoint = pointData
     },
 
     handleFieldLineSelected(lineData) {
-      this.selectedFieldPoint = null;
-      this.selectedFieldLine = lineData;
+      this.selectedFieldPoint = null
+      this.selectedFieldLine = lineData
     },
 
     updateThumbnail(newThumbnail) {
-      this.thumbnail = newThumbnail;
+      this.thumbnail = newThumbnail
     },
 
     updateCalibrationPoints(newPoints) {
-      this.calibrationPoints = { ...newPoints };
+      this.calibrationPoints = { ...newPoints }
     },
 
     updateCalibrationLines(newLines) {
-      this.calibrationLines = { ...newLines };
+      this.calibrationLines = { ...newLines }
     },
 
     updateSelectedFieldPoint(newPoint) {
-      this.selectedFieldPoint = newPoint;
+      this.selectedFieldPoint = newPoint
     },
 
     updateSelectedFieldLine(newLine) {
-      this.selectedFieldLine = newLine;
+      this.selectedFieldLine = newLine
       if (this.$refs.footballField) {
-        this.$refs.footballField.selectedLine = newLine ? newLine.id : null;
+        this.$refs.footballField.selectedLine = newLine ? newLine.id : null
       }
     },
 
     async saveCalibration() {
-      if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return;
+      if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return
 
-      const fieldKeypoints = this.$refs.footballField.keypoints;
+      const fieldKeypoints = this.$refs.footballField.keypoints
       
-      // Ensure calibrationArea is defined
       if (!this.$refs.calibrationArea) {
-        console.error('CalibrationArea component is not mounted.');
-        return;
+        console.error('CalibrationArea component is not mounted.')
+        return
       }
 
-      // Retrieve dimensions from CalibrationArea
-      const imageContainer = document.querySelector('.video-frame');
-      const imageSize = this.$refs.calibrationArea.imageSize;
+      const imageContainer = document.querySelector('.video-frame')
+      const imageSize = this.$refs.calibrationArea.imageSize
       if (!imageSize) {
-        console.error('Image size is not available.');
-        return;
+        console.error('Image size is not available.')
+        return
       }
-      const containerWidth = imageContainer.clientWidth;
-      const containerHeight = imageContainer.clientHeight;
+      const containerWidth = imageContainer.clientWidth
+      const containerHeight = imageContainer.clientHeight
 
       const calibrationData = {
         metadata: {
@@ -189,7 +260,7 @@ export default {
           width: 105,
           height: 68
         }
-      };
+      }
 
       // Traitement des points de calibration
       for (const [index, point] of Object.entries(this.calibrationPoints)) {
@@ -202,7 +273,7 @@ export default {
             x: Math.round(fieldKeypoints[index][0] * 100) / 100,
             y: Math.round(fieldKeypoints[index][1] * 100) / 100
           }
-        };
+        }
       }
 
       // Traitement des lignes
@@ -211,40 +282,29 @@ export default {
           return {
             x: point.x / containerWidth * imageSize.width,
             y: point.y / containerHeight * imageSize.height
-          };
-        });
+          }
+        })
         
         calibrationData.lines_normalized[lineName] = line.points.map(point => {
           return {
             x: point.x / containerWidth,
             y: point.y / containerHeight
-          };
-        });
+          }
+        })
       }
 
       try {
-        const response = await fetch('http://localhost:8000/calibration/save', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            video_path: this.selectedVideo.path,
-            calibration_data: calibrationData
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Erreur lors de la sauvegarde');
-        }
-
-        const result = await response.json();
+        const result = await window.electron.saveCalibration(
+          this.selectedVideo.path,
+          calibrationData
+        )
+        
         if (result.success) {
-          alert('Calibration sauvegardée avec succès !');
+          alert('Calibration sauvegardée avec succès !')
         }
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error);
-        alert('Erreur lors de la sauvegarde de la calibration');
+        console.error('Erreur lors de la sauvegarde:', error)
+        alert('Erreur lors de la sauvegarde de la calibration')
       }
     }
   }

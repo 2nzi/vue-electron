@@ -6,15 +6,23 @@ import installExtension, { VUEJS3_DEVTOOLS } from 'electron-devtools-installer'
 import * as remote from '@electron/remote/main'
 import path from 'path'
 import fs from 'fs'
+import { spawn } from 'child_process'
 const yaml = require('js-yaml')
-import fetch from 'node-fetch'
 
 const isDevelopment = process.env.NODE_ENV !== 'production'
-const FASTAPI_URL = 'http://localhost:8000'
 
 // Scheme must be registered before the app is ready
 protocol.registerSchemesAsPrivileged([
-  { scheme: 'app', privileges: { secure: true, standard: true } }
+  { 
+    scheme: 'app', 
+    privileges: { 
+      secure: true, 
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true
+    } 
+  }
 ])
 
 // Initialisez remote avant de créer la fenêtre
@@ -29,11 +37,17 @@ async function createWindow() {
       nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
       contextIsolation: true,
       enableRemoteModule: true,
+      webSecurity: false, // Permettre le chargement de ressources locales
       preload: path.join(__dirname, 'preload.js')
     }
   })
 
   remote.enable(win.webContents)
+
+  // Autoriser le chargement de fichiers locaux
+  win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true)
+  })
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {
     // Load the url of the dev server if in development mode
@@ -73,6 +87,18 @@ app.on('ready', async () => {
       console.error('Vue Devtools failed to install:', e.toString())
     }
   }
+
+  // Enregistrer le gestionnaire de protocole personnalisé
+  protocol.registerFileProtocol('local', (request, callback) => {
+    const filePath = request.url.replace('local://', '')
+    try {
+      return callback(filePath)
+    } catch (error) {
+      console.error(error)
+      return callback(404)
+    }
+  })
+
   createWindow()
 })
 
@@ -91,7 +117,7 @@ if (isDevelopment) {
   }
 }
 
-// Ajoutez ceci après les imports
+// Gestionnaires IPC
 ipcMain.handle('dialog:openDirectory', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -125,51 +151,112 @@ ipcMain.handle('video:getThumbnail', async (_, videoPath) => {
   return null
 })
 
-ipcMain.handle('calibration:save', async (_, data) => {
+ipcMain.handle('video:getFirstFrame', async (_, videoPath) => {
+  return new Promise((resolve, reject) => {
+    try {
+      if (!videoPath) {
+        throw new Error('Le chemin de la vidéo est requis')
+      }
+
+      if (!fs.existsSync(videoPath)) {
+        throw new Error(`Vidéo non trouvée: ${videoPath}`)
+      }
+
+      // Créer un dossier temporaire s'il n'existe pas
+      const tempDir = path.join(app.getPath('temp'), 'video-frames')
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true })
+      }
+
+      // Nom du fichier de sortie
+      const outputPath = path.join(tempDir, `frame-${Date.now()}.jpg`)
+
+      // Commande FFmpeg pour extraire la première frame
+      const ffmpeg = spawn('ffmpeg', [
+        '-i', videoPath,
+        '-vframes', '1',
+        '-q:v', '2',
+        outputPath
+      ])
+
+      ffmpeg.stderr.on('data', (data) => {
+        console.log(`FFmpeg stderr: ${data}`)
+      })
+
+      ffmpeg.on('close', (code) => {
+        if (code !== 0) {
+          reject(new Error(`FFmpeg process exited with code ${code}`))
+          return
+        }
+
+        // Lire l'image et la convertir en base64
+        const imageBuffer = fs.readFileSync(outputPath)
+        const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`
+
+        // Supprimer le fichier temporaire
+        fs.unlinkSync(outputPath)
+
+        resolve({
+          success: true,
+          data: base64Image
+        })
+      })
+
+      ffmpeg.on('error', (error) => {
+        reject(error)
+      })
+    } catch (error) {
+      reject(error)
+    }
+  })
+})
+
+ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData }) => {
   try {
-    const { folderPath, filePath, data: calibrationData } = data
+    // Créer le chemin du dossier calib
+    const basePath = path.dirname(videoPath)
+    const calibFolder = path.join(basePath, 'calib')
     
     // Créer le dossier s'il n'existe pas
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true })
+    fs.mkdirSync(calibFolder, { recursive: true })
+    
+    // Créer le nom du fichier de calibration
+    const videoName = path.basename(videoPath)
+    const calibFilename = `${path.parse(videoName).name}_calibration.json`
+    const calibFilepath = path.join(calibFolder, calibFilename)
+    
+    // Sauvegarder les données en JSON
+    fs.writeFileSync(
+      calibFilepath,
+      JSON.stringify(calibrationData, null, 2),
+      'utf8'
+    )
+    
+    return {
+      success: true,
+      message: 'Calibration sauvegardée avec succès',
+      filePath: calibFilepath
     }
-
-    // Sauvegarder les données en YAML
-    const yamlStr = yaml.dump(calibrationData)
-    fs.writeFileSync(filePath, yamlStr, 'utf8')
-
-    return { success: true }
   } catch (error) {
     console.error('Erreur lors de la sauvegarde:', error)
     throw error
   }
 })
 
-// Ajouter le gestionnaire pour les requêtes FastAPI
-ipcMain.handle('fastapi:request', async (_, { endpoint, method = 'GET', params = {} }) => {
+ipcMain.handle('video:readFile', async (_, videoPath) => {
   try {
-    let url = `${FASTAPI_URL}${endpoint}`
-    if (method === 'GET' && Object.keys(params).length > 0) {
-      const queryParams = new URLSearchParams(params)
-      url += `?${queryParams.toString()}`
+    if (!videoPath) {
+      throw new Error('Le chemin de la vidéo est requis')
     }
 
-    const response = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: method !== 'GET' ? JSON.stringify(params) : undefined,
-    })
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    if (!fs.existsSync(videoPath)) {
+      throw new Error(`Vidéo non trouvée: ${videoPath}`)
     }
 
-    const data = await response.json()
-    return data
+    const videoBuffer = fs.readFileSync(videoPath)
+    return videoBuffer
   } catch (error) {
-    console.error('FastAPI request error:', error)
+    console.error('Erreur lors de la lecture du fichier vidéo:', error)
     throw error
   }
 })

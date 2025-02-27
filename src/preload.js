@@ -17,30 +17,26 @@ contextBridge.exposeInMainWorld('electron', {
       throw error
     }
   },
-  getVideoThumbnail: async (videoPath) => {
+  readVideoFile: async (videoPath) => {
     try {
-      return await ipcRenderer.invoke('video:getThumbnail', videoPath)
+      const buffer = await ipcRenderer.invoke('video:readFile', videoPath)
+      return buffer
     } catch (error) {
-      console.error('Erreur lors de la génération de la miniature:', error)
+      console.error('Erreur lors de la lecture de la vidéo:', error)
       throw error
     }
   },
   getFirstFrame: async (videoPath) => {
     try {
-      const response = await ipcRenderer.invoke('fastapi:request', {
-        endpoint: '/video/first-frame',
-        method: 'GET',
-        params: { video_path: videoPath }
-      });
-      return response.data; // Retourne l'image en base64
+      return await ipcRenderer.invoke('video:getFirstFrame', videoPath)
     } catch (error) {
-      console.error('Erreur lors de la récupération de la frame:', error);
-      throw error;
+      console.error('Erreur lors de l\'extraction de la frame:', error)
+      throw error
     }
   },
-  saveCalibration: async (data) => {
+  saveCalibration: async (videoPath, calibrationData) => {
     try {
-      return await ipcRenderer.invoke('calibration:save', data)
+      return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData })
     } catch (error) {
       console.error('Erreur lors de la sauvegarde de la calibration:', error)
       throw error
