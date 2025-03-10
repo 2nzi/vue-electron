@@ -2,10 +2,10 @@
   <div class="football-field">
     <svg viewBox="-7 -2 119 72" preserveAspectRatio="xMidYMid meet" @click="handleBackgroundClick">
       <g>
-        <!-- Terrain de base -->
+        <!-- Base field -->
         <rect x="0" y="0" width="105" height="68" fill="none" stroke="#333" stroke-width="0.3"/>
         
-        <!-- Lignes cliquables -->
+        <!-- Clickable lines -->
         <g class="lines">
           <line v-for="(line, name) in lineCoordinates" 
                 :key="name"
@@ -18,7 +18,7 @@
                 @click="selectLine(name)" />
         </g>
 
-        <!-- Points importants -->
+        <!-- Key points -->
         <circle v-for="(point, index) in keypoints" 
                 :key="index"
                 :cx="point[0]" 
@@ -28,7 +28,7 @@
                 class="keypoint"
                 @click="selectPoint(index)" />
         
-        <!-- Cercle central -->
+        <!-- Center circle -->
         <circle 
           cx="52.5" 
           cy="34" 
@@ -39,7 +39,7 @@
           @click="selectLine('Circle central')" />
           
         
-        <!-- Arcs des surfaces de réparation -->
+        <!-- Penalty area arcs -->
         <path 
           v-for="arc in circle_left_right" 
           :key="'Circle ' + arc.side"
@@ -51,7 +51,7 @@
       </g>
     </svg>
     
-    <!-- Info sur la ligne ou le point sélectionné -->
+    <!-- Selected line or point info -->
     <div v-if="selectedLine && LINES[selectedLine]" class="info-overlay">
       {{ LINES[selectedLine].name }}
     </div>
@@ -64,46 +64,46 @@
 <script>
 // Définition exacte des classes de lignes comme dans SoccerNet
 const LINES = {
-  'Big rect. left bottom': { name: 'Big rect. left bottom', description: 'Surface de réparation gauche - ligne basse' },
-  'Big rect. left main': { name: 'Big rect. left main', description: 'Surface de réparation gauche - ligne parallèle' },
-  'Big rect. left top': { name: 'Big rect. left top', description: 'Surface de réparation gauche - ligne haute' },
-  'Big rect. right bottom': { name: 'Big rect. right bottom', description: 'Surface de réparation droite - ligne basse' },
-  'Big rect. right main': { name: 'Big rect. right main', description: 'Surface de réparation droite - ligne parallèle' },
-  'Big rect. right top': { name: 'Big rect. right top', description: 'Surface de réparation droite - ligne haute' },
-  'Circle central': { name: 'Circle central', description: 'Cercle central' },
-  'Circle left': { name: 'Circle left', description: 'Arc gauche' },
-  'Circle right': { name: 'Circle right', description: 'Arc droit' },
-  'Goal left crossbar': { name: 'Goal left crossbar', description: 'Barre transversale but gauche' },
-  'Goal left post left': { name: 'Goal left post left', description: 'Poteau gauche but gauche' },
-  'Goal left post right': { name: 'Goal left post right', description: 'Poteau droit but gauche' },
-  'Goal right crossbar': { name: 'Goal right crossbar', description: 'Barre transversale but droit' },
-  'Goal right post left': { name: 'Goal right post left', description: 'Poteau gauche but droit' },
-  'Goal right post right': { name: 'Goal right post right', description: 'Poteau droit but droit' },
-  'Goal unknown': { name: 'Goal unknown', description: 'But non identifié' },
-  'Line unknown': { name: 'Line unknown', description: 'Ligne non identifiée' },
-  'Middle line': { name: 'Middle line', description: 'Ligne médiane' },
-  'Side line bottom': { name: 'Side line bottom', description: 'Ligne de but inférieure' },
-  'Side line left': { name: 'Side line left', description: 'Ligne de touche gauche' },
-  'Side line right': { name: 'Side line right', description: 'Ligne de touche droite' },
-  'Side line top': { name: 'Side line top', description: 'Ligne de but supérieure' },
-  'Small rect. left bottom': { name: 'Small rect. left bottom', description: 'Petite surface gauche - ligne basse' },
-  'Small rect. left main': { name: 'Small rect. left main', description: 'Petite surface gauche - ligne parallèle' },
-  'Small rect. left top': { name: 'Small rect. left top', description: 'Petite surface gauche - ligne haute' },
-  'Small rect. right bottom': { name: 'Small rect. right bottom', description: 'Petite surface droite - ligne basse' },
-  'Small rect. right main': { name: 'Small rect. right main', description: 'Petite surface droite - ligne parallèle' },
-  'Small rect. right top': { name: 'Small rect. right top', description: 'Petite surface droite - ligne haute' },
+  'Big rect. left bottom': { name: 'Big rect. left bottom', description: 'Left penalty area - bottom line' },
+  'Big rect. left main': { name: 'Big rect. left main', description: 'Left penalty area - parallel line' },
+  'Big rect. left top': { name: 'Big rect. left top', description: 'Left penalty area - top line' },
+  'Big rect. right bottom': { name: 'Big rect. right bottom', description: 'Right penalty area - bottom line' },
+  'Big rect. right main': { name: 'Big rect. right main', description: 'Right penalty area - parallel line' },
+  'Big rect. right top': { name: 'Big rect. right top', description: 'Right penalty area - top line' },
+  'Circle central': { name: 'Center circle', description: 'Center circle' },
+  'Circle left': { name: 'Left circle', description: 'Left arc' },
+  'Circle right': { name: 'Right circle', description: 'Right arc' },
+  'Goal left crossbar': { name: 'Goal left crossbar', description: 'Left goal crossbar' },
+  'Goal left post left': { name: 'Goal left post left', description: 'Left goal - left post' },
+  'Goal left post right': { name: 'Goal left post right', description: 'Left goal - right post' },
+  'Goal right crossbar': { name: 'Goal right crossbar', description: 'Right goal crossbar' },
+  'Goal right post left': { name: 'Goal right post left', description: 'Right goal - left post' },
+  'Goal right post right': { name: 'Goal right post right', description: 'Right goal - right post' },
+  'Goal unknown': { name: 'Goal unknown', description: 'Unidentified goal' },
+  'Line unknown': { name: 'Line unknown', description: 'Unidentified line' },
+  'Middle line': { name: 'Middle line', description: 'Center line' },
+  'Side line bottom': { name: 'Side line bottom', description: 'Bottom goal line' },
+  'Side line left': { name: 'Side line left', description: 'Left touch line' },
+  'Side line right': { name: 'Side line right', description: 'Right touch line' },
+  'Side line top': { name: 'Side line top', description: 'Top goal line' },
+  'Small rect. left bottom': { name: 'Small rect. left bottom', description: 'Left goal area - bottom line' },
+  'Small rect. left main': { name: 'Small rect. left main', description: 'Left goal area - parallel line' },
+  'Small rect. left top': { name: 'Small rect. left top', description: 'Left goal area - top line' },
+  'Small rect. right bottom': { name: 'Small rect. right bottom', description: 'Right goal area - bottom line' },
+  'Small rect. right main': { name: 'Small rect. right main', description: 'Right goal area - parallel line' },
+  'Small rect. right top': { name: 'Small rect. right top', description: 'Right goal area - top line' },
   center_circle: {
-    name: "Cercle central",
+    name: "Center circle",
     type: "circle",
     color: "#00FF15"
   },
   circle_left: {
-    name: "Circle left",
+    name: "Left circle",
     type: "arc",
     color: "#00FF15"
   },
   circle_right: {
-    name: "Circle right",
+    name: "Right circle",
     type: "arc",
     color: "#00FF15"
   }
@@ -124,9 +124,9 @@ const FIELD_DIMENSIONS = {
 };
 
 const POINTS = {
-  0: { name: "Point central" },
-  1: { name: "Point de penalty gauche" },
-  2: { name: "Point de penalty droit" }
+  0: { name: "Center point" },
+  1: { name: "Left penalty point" },
+  2: { name: "Right penalty point" }
 };
 
 export default {
@@ -149,9 +149,9 @@ export default {
       FIELD_DIMENSIONS,
       POINTS,
       keypoints: [
-        [52.5, 34],    // Point central
-        [11, 34],      // Point de penalty gauche
-        [94, 34],      // Point de penalty droit
+        [52.5, 34],    // Center point
+        [11, 34],      // Left penalty point
+        [94, 34],      // Right penalty point
       ],
       lineCoordinates: {
         'Side line top': { x1: 0, y1: 0, x2: 105, y2: 0 },
@@ -160,7 +160,7 @@ export default {
         'Side line right': { x1: 105, y1: 0, x2: 105, y2: 68 },
         'Middle line': { x1: 52.5, y1: 0, x2: 52.5, y2: 68 },
         
-        // Surfaces de réparation
+        // Penalty areas
         'Big rect. left bottom': { x1: 0, y1: 54.16, x2: 16.5, y2: 54.16 },
         'Big rect. left main': { x1: 16.5, y1: 13.84, x2: 16.5, y2: 54.16 },
         'Big rect. left top': { x1: 0, y1: 13.84, x2: 16.5, y2: 13.84 },
@@ -168,7 +168,7 @@ export default {
         'Big rect. right main': { x1: 88.5, y1: 13.84, x2: 88.5, y2: 54.16 },
         'Big rect. right top': { x1: 88.5, y1: 13.84, x2: 105, y2: 13.84 },
         
-        // Petites surfaces
+        // Goal areas
         'Small rect. left bottom': { x1: 0, y1: 43.16, x2: 5.5, y2: 43.16 },
         'Small rect. left main': { x1: 5.5, y1: 24.84, x2: 5.5, y2: 43.16 },
         'Small rect. left top': { x1: 0, y1: 24.84, x2: 5.5, y2: 24.84 },
@@ -176,7 +176,7 @@ export default {
         'Small rect. right main': { x1: 99.5, y1: 24.84, x2: 99.5, y2: 43.16 },
         'Small rect. right top': { x1: 99.5, y1: 24.84, x2: 105, y2: 24.84 },
         
-        // Buts
+        // Goals
         'Goal left post left': { x1: -5, y1: 37.66, x2: 0, y2: 37.66 },
         'Goal left crossbar': { x1: -5, y1: 30.34, x2: -5, y2: 37.66 },
         'Goal left post right': { x1: -5, y1: 30.34, x2: 0, y2: 30.34 },
@@ -184,7 +184,7 @@ export default {
         'Goal right crossbar': { x1: 110, y1: 30.34, x2: 110, y2: 37.66 },
         'Goal right post right': { x1: 105, y1: 37.66, x2: 110, y2: 37.66 },
       },
-      lastSelected: null, // 'point' ou 'line'
+      lastSelected: null, // 'point' or 'line'
       circle_left_right: [
         { x: 11, y: 34, side: 'left' },
         { x: 94, y: 34, side: 'right' }
@@ -284,13 +284,13 @@ export default {
   cursor: pointer;
 }
 
-/* Style spécifique pour les lignes des buts */
+/* Specific style for goal lines */
 .field-line[class*="Goal"] {
-  stroke-width: 1;  /* Ligne plus épaisse pour les buts */
+  stroke-width: 1;  /* Thicker line for goals */
 }
 
 .field-line:hover {
-  stroke-width: 1.2;  /* Encore plus épais au survol */
+  stroke-width: 1.2;  /* Even thicker on hover */
   opacity: 0.8;
 }
 
@@ -307,7 +307,7 @@ export default {
 }
 
 .keypoint {
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); /* Effet de brillance pour les points */
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5)); /* Glow effect for points */
   cursor: pointer;
 }
 

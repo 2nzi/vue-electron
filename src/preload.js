@@ -5,7 +5,7 @@ contextBridge.exposeInMainWorld('electron', {
     try {
       return await ipcRenderer.invoke('dialog:openDirectory')
     } catch (error) {
-      console.error('Erreur lors de l\'ouverture du dossier:', error)
+      console.error('Error opening directory:', error)
       throw error
     }
   },
@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('electron', {
     try {
       return await ipcRenderer.invoke('folder:getVideos', folderPath)
     } catch (error) {
-      console.error('Erreur lors de la lecture du dossier:', error)
+      console.error('Error reading directory:', error)
       throw error
     }
   },
@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electron', {
       const buffer = await ipcRenderer.invoke('video:readFile', videoPath)
       return buffer
     } catch (error) {
-      console.error('Erreur lors de la lecture de la vidéo:', error)
+      console.error('Error reading video:', error)
       throw error
     }
   },
@@ -30,7 +30,7 @@ contextBridge.exposeInMainWorld('electron', {
     try {
       return await ipcRenderer.invoke('video:getFirstFrame', videoPath)
     } catch (error) {
-      console.error('Erreur lors de l\'extraction de la frame:', error)
+      console.error('Error extracting frame:', error)
       throw error
     }
   },
@@ -38,7 +38,7 @@ contextBridge.exposeInMainWorld('electron', {
     try {
       return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData })
     } catch (error) {
-      console.error('Erreur lors de la sauvegarde de la calibration:', error)
+      console.error('Error saving calibration:', error)
       throw error
     }
   }

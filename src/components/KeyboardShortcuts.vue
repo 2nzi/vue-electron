@@ -2,53 +2,53 @@
   <div>
     <button @click="showModal = true" class="shortcuts-btn">
       <i class="fas fa-keyboard"></i>
-      Raccourcis
+      Shortcuts
     </button>
 
     <div v-if="showModal" class="modal-overlay" @click="showModal = false">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2>Raccourcis Clavier</h2>
+          <h2>Keyboard Shortcuts</h2>
           <button class="close-btn" @click="showModal = false">&times;</button>
         </div>
         <div class="shortcuts-content">
           <div class="shortcuts-section">
-            <h3>Points de Calibration</h3>
+            <h3>Calibration Points</h3>
             <div class="shortcut-item">
-              <span class="key">Clic droit</span>
-              <span class="description">Ajouter un point</span>
+              <span class="key">Right click</span>
+              <span class="description">Add a point</span>
             </div>
             <div class="shortcut-item">
-              <span class="key">Clic sur point</span>
-              <span class="description">Sélectionner et modifier la position du point</span>
+              <span class="key">Click on point</span>
+              <span class="description">Select and modify point position</span>
             </div>
             <div class="shortcut-item">
-              <span class="key">Ctrl + Clic droit</span>
-              <span class="description">Marquer un point comme intersection</span>
-            </div>
-          </div>
-
-          <div class="shortcuts-section">
-            <h3>Lignes de Calibration</h3>
-            <div class="shortcut-item">
-              <span class="key">Clic sur ligne</span>
-              <span class="description">Sélectionner une ligne pour labeliser</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="key">Clic droit</span>
-              <span class="description">Ajouter un point à la ligne</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="key">Clic gauche</span>
-              <span class="description">Terminer la ligne</span>
+              <span class="key">Ctrl + Right click</span>
+              <span class="description">Mark point as intersection</span>
             </div>
           </div>
 
           <div class="shortcuts-section">
-            <h3>Édition</h3>
+            <h3>Calibration Lines</h3>
             <div class="shortcut-item">
-              <span class="key">Suppr</span>
-              <span class="description">Supprimer l'élément sélectionné</span>
+              <span class="key">Click on line</span>
+              <span class="description">Select a line for labeling</span>
+            </div>
+            <div class="shortcut-item">
+              <span class="key">Right click</span>
+              <span class="description">Add point to line</span>
+            </div>
+            <div class="shortcut-item">
+              <span class="key">Left click</span>
+              <span class="description">Finish line</span>
+            </div>
+          </div>
+
+          <div class="shortcuts-section">
+            <h3>Editing</h3>
+            <div class="shortcut-item">
+              <span class="key">Delete</span>
+              <span class="description">Delete selected element</span>
             </div>
           </div>
         </div>

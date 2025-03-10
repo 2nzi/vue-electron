@@ -1,22 +1,22 @@
 <template>
   <div>
-    <!-- Bouton Clear -->
+    <!-- Clear button -->
     <button 
       class="clear-btn" 
       @click="showConfirmDialog"
       :disabled="disabled">
-      <span class="clear-text">Effacer tout</span>
+      <span class="clear-text">Clear all</span>
     </button>
 
-    <!-- Dialog de confirmation avec style néon -->
+    <!-- Confirmation dialog with neon style -->
     <div v-if="showDialog" class="dialog-overlay" @click="closeDialog">
       <div class="dialog-content neon-panel" @click.stop>
         <h3 class="neon-title">Confirmation</h3>
-        <p class="dialog-message">Êtes-vous sûr de vouloir effacer tous les points et lignes ?</p>
-        <p class="warning-text">Cette action est irréversible.</p>
+        <p class="dialog-message">Are you sure you want to delete all points and lines?</p>
+        <p class="warning-text">This action cannot be undone.</p>
         <div class="dialog-buttons">
-          <button class="cancel-btn neon-btn-gray" @click="closeDialog">Annuler</button>
-          <button class="confirm-btn neon-btn-red" @click="confirmClear">Confirmer</button>
+          <button class="cancel-btn neon-btn-gray" @click="closeDialog">Cancel</button>
+          <button class="confirm-btn neon-btn-red" @click="confirmClear">Confirm</button>
         </div>
       </div>
     </div>

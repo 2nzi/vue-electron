@@ -33,27 +33,27 @@ async function createWindow() {
   const win = new BrowserWindow({
     width: 1920,
     height: 1080,
-    show: false, // Ne pas montrer la fenêtre jusqu'à ce qu'elle soit prête
+    show: false, // Don't show the window until it's ready
     webPreferences: {
       nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
       contextIsolation: true,
       enableRemoteModule: true,
-      webSecurity: false, // Permettre le chargement de ressources locales
+      webSecurity: false, // Allow loading local resources
       preload: path.join(__dirname, 'preload.js')
     }
   })
 
   remote.enable(win.webContents)
 
-  // Autoriser le chargement de fichiers locaux
+  // Allow loading local files
   win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(true)
   })
 
-  // Maximiser la fenêtre avant de la montrer
+  // Maximize window before showing it
   win.maximize()
   
-  // Montrer la fenêtre une fois qu'elle est prête
+  // Show window once it's ready
   win.once('ready-to-show', () => {
     win.show()
   })
@@ -97,7 +97,7 @@ app.on('ready', async () => {
     }
   }
 
-  // Enregistrer le gestionnaire de protocole personnalisé
+  // Register custom protocol handler
   protocol.registerFileProtocol('local', (request, callback) => {
     const filePath = request.url.replace('local://', '')
     try {
@@ -137,7 +137,7 @@ ipcMain.handle('dialog:openDirectory', async () => {
 
 ipcMain.handle('folder:getVideos', async (_, folderPath) => {
   if (!folderPath) {
-    throw new Error('Le chemin du dossier est requis')
+    throw new Error('Folder path is required')
   }
 
   const files = fs.readdirSync(folderPath)
@@ -154,9 +154,9 @@ ipcMain.handle('folder:getVideos', async (_, folderPath) => {
 
 ipcMain.handle('video:getThumbnail', async (_, videoPath) => {
   if (!videoPath) {
-    throw new Error('Le chemin de la vidéo est requis')
+    throw new Error('Video path is required')
   }
-  // Retourner null temporairement au lieu de générer une miniature
+  // Temporarily return null instead of generating thumbnail
   return null
 })
 
@@ -164,23 +164,23 @@ ipcMain.handle('video:getFirstFrame', async (_, videoPath) => {
   return new Promise((resolve, reject) => {
     try {
       if (!videoPath) {
-        throw new Error('Le chemin de la vidéo est requis')
+        throw new Error('Video path is required')
       }
 
       if (!fs.existsSync(videoPath)) {
-        throw new Error(`Vidéo non trouvée: ${videoPath}`)
+        throw new Error(`Video not found: ${videoPath}`)
       }
 
-      // Créer un dossier temporaire s'il n'existe pas
+      // Create temp directory if it doesn't exist
       const tempDir = path.join(app.getPath('temp'), 'video-frames')
       if (!fs.existsSync(tempDir)) {
         fs.mkdirSync(tempDir, { recursive: true })
       }
 
-      // Nom du fichier de sortie
+      // Output filename
       const outputPath = path.join(tempDir, `frame-${Date.now()}.jpg`)
 
-      // Commande FFmpeg pour extraire la première frame
+      // FFmpeg command to extract first frame
       const ffmpeg = spawn('ffmpeg', [
         '-i', videoPath,
         '-vframes', '1',
@@ -198,11 +198,11 @@ ipcMain.handle('video:getFirstFrame', async (_, videoPath) => {
           return
         }
 
-        // Lire l'image et la convertir en base64
+        // Read image and convert to base64
         const imageBuffer = fs.readFileSync(outputPath)
         const base64Image = `data:image/jpeg;base64,${imageBuffer.toString('base64')}`
 
-        // Supprimer le fichier temporaire
+        // Delete temp file
         fs.unlinkSync(outputPath)
 
         resolve({
@@ -222,19 +222,19 @@ ipcMain.handle('video:getFirstFrame', async (_, videoPath) => {
 
 ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData }) => {
   try {
-    // Créer le chemin du dossier calib
+    // Create calib folder path
     const basePath = path.dirname(videoPath)
     const calibFolder = path.join(basePath, 'calib')
     
-    // Créer le dossier s'il n'existe pas
+    // Create folder if it doesn't exist
     fs.mkdirSync(calibFolder, { recursive: true })
     
-    // Créer le nom du fichier de calibration
+    // Create calibration filename
     const videoName = path.basename(videoPath)
     const calibFilename = `${path.parse(videoName).name}_calibration.json`
     const calibFilepath = path.join(calibFolder, calibFilename)
     
-    // Sauvegarder les données en JSON
+    // Save data as JSON
     fs.writeFileSync(
       calibFilepath,
       JSON.stringify(calibrationData, null, 2),
@@ -243,11 +243,11 @@ ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData }) => 
     
     return {
       success: true,
-      message: 'Calibration sauvegardée avec succès',
+      message: 'Calibration saved successfully',
       filePath: calibFilepath
     }
   } catch (error) {
-    console.error('Erreur lors de la sauvegarde:', error)
+    console.error('Error saving calibration:', error)
     throw error
   }
 })
@@ -255,17 +255,17 @@ ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData }) => 
 ipcMain.handle('video:readFile', async (_, videoPath) => {
   try {
     if (!videoPath) {
-      throw new Error('Le chemin de la vidéo est requis')
+      throw new Error('Video path is required')
     }
 
     if (!fs.existsSync(videoPath)) {
-      throw new Error(`Vidéo non trouvée: ${videoPath}`)
+      throw new Error(`Video not found: ${videoPath}`)
     }
 
     const videoBuffer = fs.readFileSync(videoPath)
     return videoBuffer
   } catch (error) {
-    console.error('Erreur lors de la lecture du fichier vidéo:', error)
+    console.error('Error reading video file:', error)
     throw error
   }
 })

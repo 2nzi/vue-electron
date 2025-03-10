@@ -86,7 +86,7 @@
         class="save-btn" 
         @click="$emit('save-calibration')"
         :disabled="Object.keys(calibrationLines).length === 0">
-        <span class="save-text">Sauvegarder la calibration</span>
+        <span class="save-text">Save calibration</span>
       </button>
     </div>
   </div>

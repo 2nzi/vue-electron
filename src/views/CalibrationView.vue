@@ -17,9 +17,9 @@
         <!-- <div class="metadata-section" v-if="selectedVideo">
           <h4>METADATA</h4>
           <div class="metadata-info">
-            <p>nom: {{ selectedVideo.name }}</p>
-            <p>session: {{ selectedVideo.session || 'nom_de_la_session' }}</p>
-            <p>création: {{ new Date().toLocaleDateString() }}</p>
+            <p>name: {{ selectedVideo.name }}</p>
+            <p>session: {{ selectedVideo.session || 'session_name' }}</p>
+            <p>created: {{ new Date().toLocaleDateString() }}</p>
           </div>
         </div> -->
 
@@ -101,27 +101,27 @@ export default {
           await this.selectVideo(this.videos[0])
         }
       } catch (error) {
-        console.error('Erreur lors du chargement des vidéos:', error)
+        console.error('Error loading videos:', error)
       }
     },
 
     async selectVideo(video) {
-      console.log('Début de selectVideo avec:', video)
+      console.log('Starting selectVideo with:', video)
       try {
         this.selectedVideo = video
         this.thumbnail = null
         
-        console.log('Extraction de la première frame de la vidéo:', video.path)
+        console.log('Extracting first frame from video:', video.path)
         const result = await window.electron.getFirstFrame(video.path)
         
         if (result.success) {
-          console.log('Frame extraite avec succès')
+          console.log('Frame extracted successfully')
           this.thumbnail = result.data
         } else {
-          throw new Error('Échec de l\'extraction de la frame')
+          throw new Error('Failed to extract frame')
         }
       } catch (error) {
-        console.error('Erreur détaillée dans selectVideo:', error)
+        console.error('Detailed error in selectVideo:', error)
         this.thumbnail = null
       }
     },
@@ -239,11 +239,11 @@ export default {
         )
         
         if (result.success) {
-          alert('Calibration sauvegardée avec succès !')
+          alert('Calibration saved successfully!')
         }
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde:', error)
-        alert('Erreur lors de la sauvegarde de la calibration')
+        console.error('Error during save:', error)
+        alert('Error saving calibration')
       }
     }
   }
