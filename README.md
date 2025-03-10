@@ -1,6 +1,10 @@
-# Vue-Electron Application
+# Polylines Labeling Tool - Vue-Electron Application
 
 This desktop application is built with Vue.js and Electron, providing a modern and responsive user interface.
+
+## 🖼 Interface Preview
+
+![Labeling Software Interface](./public/Labeling-Software.png)
 
 ## 🚀 Prerequisites
 
@@ -12,7 +16,7 @@ Before you begin, ensure you have the following installed on your system:
 
 1. Clone the repository:
 ```bash
-git clone [your-repository-url]
+gh repo clone 2nzi/vue-electron
 cd vue-electron
 ```
 
