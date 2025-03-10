@@ -10,6 +10,10 @@
       />
 
       <div class="content-area">
+        <div class="header-actions">
+          <KeyboardShortcuts />
+        </div>
+
         <!-- <div class="metadata-section" v-if="selectedVideo">
           <h4>METADATA</h4>
           <div class="metadata-info">
@@ -55,13 +59,15 @@
 import VideoSidebar from '@/components/VideoSidebar.vue'
 import CalibrationArea from '@/components/CalibrationArea.vue'
 import FootballField from '@/components/FootballField.vue'
+import KeyboardShortcuts from '@/components/KeyboardShortcuts.vue'
 
 export default {
   name: 'CalibrationView',
   components: {
     VideoSidebar,
     CalibrationArea,
-    FootballField
+    FootballField,
+    KeyboardShortcuts
   },
   props: {
     folderPath: {
@@ -304,5 +310,11 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.header-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
 }
 </style> 
