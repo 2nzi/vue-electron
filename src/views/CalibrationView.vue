@@ -10,14 +10,14 @@
       />
 
       <div class="content-area">
-        <div class="metadata-section" v-if="selectedVideo">
+        <!-- <div class="metadata-section" v-if="selectedVideo">
           <h4>METADATA</h4>
           <div class="metadata-info">
             <p>nom: {{ selectedVideo.name }}</p>
             <p>session: {{ selectedVideo.session || 'nom_de_la_session' }}</p>
             <p>création: {{ new Date().toLocaleDateString() }}</p>
           </div>
-        </div>
+        </div> -->
 
         <div class="video-display">
           <div class="calibration-container">
