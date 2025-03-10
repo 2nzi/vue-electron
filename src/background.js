@@ -31,8 +31,9 @@ remote.initialize()
 async function createWindow() {
   // Create the browser window.
   const win = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1920,
+    height: 1080,
+    show: false, // Ne pas montrer la fenêtre jusqu'à ce qu'elle soit prête
     webPreferences: {
       nodeIntegration: process.env.ELECTRON_NODE_INTEGRATION,
       contextIsolation: true,
@@ -47,6 +48,14 @@ async function createWindow() {
   // Autoriser le chargement de fichiers locaux
   win.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(true)
+  })
+
+  // Maximiser la fenêtre avant de la montrer
+  win.maximize()
+  
+  // Montrer la fenêtre une fois qu'elle est prête
+  win.once('ready-to-show', () => {
+    win.show()
   })
 
   if (process.env.WEBPACK_DEV_SERVER_URL) {

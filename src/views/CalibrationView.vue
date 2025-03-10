@@ -21,20 +21,6 @@
 
         <div class="video-display">
           <div class="calibration-container">
-            <video 
-              v-if="selectedVideo"
-              ref="videoPlayer"
-              :src="videoSrc"
-              style="display: none;"
-              @loadeddata="onVideoLoaded"
-              @error="onVideoError"
-              @loadstart="onVideoLoadStart"
-              @waiting="onVideoWaiting"
-              controls
-              preload="metadata"
-              crossorigin="anonymous"
-              type="video/mp4; codecs='avc1.42E01E, mp4a.40.2'"
-            ></video>
             <CalibrationArea
               ref="calibrationArea"
               :thumbnail="thumbnail"
@@ -132,59 +118,6 @@ export default {
         console.error('Erreur détaillée dans selectVideo:', error)
         this.thumbnail = null
       }
-    },
-
-    onVideoLoaded() {
-      console.log('Début de onVideoLoaded')
-      try {
-        const video = this.$refs.videoPlayer
-        console.log('Dimensions de la vidéo:', {
-          width: video.videoWidth,
-          height: video.videoHeight,
-          duration: video.duration,
-          readyState: video.readyState
-        })
-
-        // Créer un canvas pour capturer la première frame
-        console.log('Création du canvas...')
-        const canvas = document.createElement('canvas')
-        canvas.width = video.videoWidth
-        canvas.height = video.videoHeight
-        const ctx = canvas.getContext('2d')
-        
-        // Dessiner la première frame
-        console.log('Dessin de la frame sur le canvas...')
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        
-        // Convertir en base64
-        console.log('Conversion en base64...')
-        this.thumbnail = canvas.toDataURL('image/jpeg', 0.85)
-        console.log('Thumbnail créé avec succès')
-      } catch (error) {
-        console.error('Erreur détaillée dans onVideoLoaded:', error)
-        console.error('État de la vidéo:', {
-          videoRef: !!this.$refs.videoPlayer,
-          videoSrc: this.videoSrc,
-          selectedVideo: this.selectedVideo
-        })
-      }
-    },
-
-    onVideoError(error) {
-      console.error('Erreur de chargement de la vidéo:', {
-        error: error,
-        videoElement: this.$refs.videoPlayer,
-        errorCode: this.$refs.videoPlayer?.error?.code,
-        errorMessage: this.$refs.videoPlayer?.error?.message
-      })
-    },
-
-    onVideoLoadStart() {
-      console.log('Début du chargement de la vidéo')
-    },
-
-    onVideoWaiting() {
-      console.log('Vidéo en attente de données')
     },
 
     toggleSidebar() {

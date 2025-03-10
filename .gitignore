@@ -24,3 +24,20 @@ pnpm-debug.log*
 
 #Electron-builder output
 # /dist_electron
+
+*.exe
+*.blockmap
+*.dmg
+*.deb
+*.rpm
+*.AppImage
+*.snap
+*.tar.gz
+*/bundled
+*/mac
+*/mac_arm64
+*/mac_x64
+*/mac_arm64_x64
+*/mac_arm64_x64_x64
+*/mac_arm64_x64_x64_x64
+*/win-unpacked
