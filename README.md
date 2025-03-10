@@ -4,7 +4,7 @@ This desktop application is built with Vue.js and Electron, providing a modern a
 
 ## 🖼 Interface Preview
 
-![Labeling Software Interface](./public/Labeling-Software.png)
+![Labeling Software Interface](./public/Labeling.png)
 
 ## 🚀 Prerequisites
 
