@@ -5,7 +5,27 @@
         {{ showSidebar ? '←' : '→' }}
       </button>
     </div>
-    <div class="video-list" v-if="showSidebar">
+    <div class="folder-section" v-if="showSidebar">
+      <div class="folder-item">
+        <span class="folder-label">Input Folder</span>
+        <div class="folder-content">
+          <span class="folder-path">{{ inputFolder || 'Not selected' }}</span>
+          <button @click="selectInputFolder" class="folder-btn">
+            Select
+          </button>
+        </div>
+      </div>
+      <div class="folder-item">
+        <span class="folder-label">Output Folder</span>
+        <div class="folder-content">
+          <span class="folder-path">{{ outputFolder || 'Not selected' }}</span>
+          <button @click="selectOutputFolder" class="folder-btn">
+            Select
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="video-list" v-if="showSidebar && inputFolder">
       <div v-for="video in videos" 
            :key="video.path"
            class="video-item neon-item"
@@ -32,12 +52,32 @@ export default {
     showSidebar: {
       type: Boolean,
       default: true
+    },
+    inputFolder: {
+      type: String,
+      default: ''
+    },
+    outputFolder: {
+      type: String,
+      default: ''
     }
   },
-  emits: ['video-selected', 'toggle-sidebar'],
+  emits: ['video-selected', 'toggle-sidebar', 'input-folder-selected', 'output-folder-selected'],
   methods: {
     toggleSidebar() {
       this.$emit('toggle-sidebar')
+    },
+    async selectInputFolder() {
+      const result = await window.electron.openDirectory()
+      if (!result.canceled && result.filePaths.length > 0) {
+        this.$emit('input-folder-selected', result.filePaths[0])
+      }
+    },
+    async selectOutputFolder() {
+      const result = await window.electron.openDirectory()
+      if (!result.canceled && result.filePaths.length > 0) {
+        this.$emit('output-folder-selected', result.filePaths[0])
+      }
     }
   }
 }
@@ -82,6 +122,62 @@ export default {
 }
 
 .toggle-sidebar-btn:hover {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.5);
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+  text-shadow: 0 0 15px rgba(76, 175, 80, 0.8);
+}
+
+.folder-section {
+  padding: 1rem;
+  border-bottom: 1px solid rgba(76, 175, 80, 0.3);
+}
+
+.folder-item {
+  margin-bottom: 1rem;
+}
+
+.folder-label {
+  display: block;
+  color: #4CAF50;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+}
+
+.folder-content {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.folder-path {
+  flex: 1;
+  color: #ffffff;
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.3rem;
+  background-color: rgba(58, 58, 58, 0.95);
+  border: 1px solid rgba(76, 175, 80, 0.2);
+  border-radius: 4px;
+}
+
+.folder-btn {
+  background: none;
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #4CAF50;
+  cursor: pointer;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  transition: all 0.3s ease;
+  text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+  white-space: nowrap;
+}
+
+.folder-btn:hover {
   background-color: rgba(76, 175, 80, 0.1);
   border-color: rgba(76, 175, 80, 0.5);
   box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);

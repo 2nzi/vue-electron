@@ -220,11 +220,10 @@ ipcMain.handle('video:getFirstFrame', async (_, videoPath) => {
   })
 })
 
-ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData }) => {
+ipcMain.handle('calibration:save', async (_, { videoPath, calibrationData, outputFolder }) => {
   try {
-    // Create calib folder path
-    const basePath = path.dirname(videoPath)
-    const calibFolder = path.join(basePath, 'calib')
+    // Create calib folder path in the output directory
+    const calibFolder = path.join(outputFolder, 'calib')
     
     // Create folder if it doesn't exist
     fs.mkdirSync(calibFolder, { recursive: true })

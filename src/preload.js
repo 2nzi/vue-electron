@@ -34,9 +34,9 @@ contextBridge.exposeInMainWorld('electron', {
       throw error
     }
   },
-  saveCalibration: async (videoPath, calibrationData) => {
+  saveCalibration: async (videoPath, calibrationData, outputFolder) => {
     try {
-      return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData })
+      return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData, outputFolder })
     } catch (error) {
       console.error('Error saving calibration:', error)
       throw error

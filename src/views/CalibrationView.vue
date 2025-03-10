@@ -5,8 +5,12 @@
         :videos="videos"
         :selectedVideo="selectedVideo"
         :showSidebar="showSidebar"
+        :inputFolder="inputFolder"
+        :outputFolder="outputFolder"
         @video-selected="selectVideo"
         @toggle-sidebar="toggleSidebar"
+        @input-folder-selected="handleInputFolderSelected"
+        @output-folder-selected="handleOutputFolderSelected"
       />
 
       <div class="content-area">
@@ -69,12 +73,6 @@ export default {
     FootballField,
     KeyboardShortcuts
   },
-  props: {
-    folderPath: {
-      type: String,
-      required: true
-    }
-  },
   data() {
     return {
       videos: [],
@@ -85,7 +83,9 @@ export default {
       selectedFieldPoint: null,
       calibrationLines: {},
       selectedFieldLine: null,
-      videoSrc: ''
+      videoSrc: '',
+      inputFolder: '',
+      outputFolder: ''
     }
   },
   async created() {
@@ -94,9 +94,20 @@ export default {
     }
   },
   methods: {
+    async handleInputFolderSelected(folderPath) {
+      this.inputFolder = folderPath
+      await this.loadVideos()
+    },
+
+    handleOutputFolderSelected(folderPath) {
+      this.outputFolder = folderPath
+    },
+
     async loadVideos() {
+      if (!this.inputFolder) return
+      
       try {
-        this.videos = await window.electron.getVideosFromFolder(this.folderPath)
+        this.videos = await window.electron.getVideosFromFolder(this.inputFolder)
         if (this.videos.length > 0) {
           await this.selectVideo(this.videos[0])
         }
@@ -164,7 +175,12 @@ export default {
     },
 
     async saveCalibration() {
-      if (!this.selectedVideo || Object.keys(this.calibrationLines).length === 0) return
+      if (!this.selectedVideo || !this.outputFolder || Object.keys(this.calibrationLines).length === 0) {
+        if (!this.outputFolder) {
+          alert('Please select an output folder first')
+        }
+        return
+      }
 
       const fieldKeypoints = this.$refs.footballField.keypoints
       
@@ -235,7 +251,8 @@ export default {
       try {
         const result = await window.electron.saveCalibration(
           this.selectedVideo.path,
-          calibrationData
+          calibrationData,
+          this.outputFolder
         )
         
         if (result.success) {
