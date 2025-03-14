@@ -82,7 +82,14 @@
       <div class="object-timeline" v-if="selectedVideo">
         <div class="object-track">
           <div class="track-label">Object 1</div>
-          <div class="track-content"></div>
+          <div class="track-content">
+            <div v-for="time in Object.keys(framePoints)" 
+                 :key="time"
+                 class="track-marker"
+                 :style="{ left: (time / duration * 100) + '%' }"
+                 :class="{ 'active': isCurrentFrame(time) }">
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -346,6 +353,11 @@ export default {
       
       // Log coordinates with frame time
       console.log(`Point added at x: ${x}, y: ${y} at frame time: ${frameTime}`)
+    },
+
+    isCurrentFrame(time) {
+      const currentFrameTime = Math.round(this.currentTime * 100) / 100
+      return Math.abs(currentFrameTime - parseFloat(time)) < 0.01
     },
   },
 
@@ -675,5 +687,20 @@ export default {
   height: 30px;
   background: #2a2a2a;
   border-radius: 4px;
+  position: relative;
+}
+
+.track-marker {
+  position: absolute;
+  width: 4px;
+  height: 100%;
+  background: #4CAF50;
+  transform: translateX(-50%);
+  transition: background-color 0.2s ease;
+}
+
+.track-marker.active {
+  background: #FFC107;
+  box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
 }
 </style>
