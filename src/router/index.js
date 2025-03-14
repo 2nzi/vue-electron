@@ -1,11 +1,21 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import CalibrationView from '../views/CalibrationView.vue'
+import SegmentationView from '../views/SegmentationView.vue'
 
 const routes = [
   {
     path: '/',
+    redirect: '/calibration'
+  },
+  {
+    path: '/calibration',
     name: 'calibration',
     component: CalibrationView
+  },
+  {
+    path: '/segmentation',
+    name: 'segmentation',
+    component: SegmentationView
   }
 ]
 
