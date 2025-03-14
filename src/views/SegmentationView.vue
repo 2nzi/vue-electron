@@ -94,7 +94,8 @@ export default {
       currentThumbnailIndex: 0,
       timelinePosition: 0,
       isDragging: false,
-      isScrubbing: false
+      isScrubbing: false,
+      animationFrameId: null
     }
   },
 
@@ -133,6 +134,12 @@ export default {
       this.currentThumbnailIndex = 0
       this.timelinePosition = 0
       
+      // Cancel any ongoing animation
+      if (this.animationFrameId) {
+        cancelAnimationFrame(this.animationFrameId)
+        this.animationFrameId = null
+      }
+      
       // Wait for the video to be loaded in the DOM
       this.$nextTick(() => {
         const video = this.$refs.videoPlayer
@@ -147,9 +154,16 @@ export default {
       if (video.paused) {
         video.play()
         this.isPlaying = true
+        // Start smooth animation
+        this.updateTimelinePosition()
       } else {
         video.pause()
         this.isPlaying = false
+        // Stop animation
+        if (this.animationFrameId) {
+          cancelAnimationFrame(this.animationFrameId)
+          this.animationFrameId = null
+        }
       }
     },
 
@@ -173,13 +187,20 @@ export default {
     },
 
     updateTimelinePosition() {
-      this.timelinePosition = (this.currentTime / this.duration) * 100
+      if (this.isPlaying) {
+        const video = this.$refs.videoPlayer
+        if (video) {
+          this.currentTime = video.currentTime
+          this.timelinePosition = (this.currentTime / this.duration) * 100
+          this.animationFrameId = requestAnimationFrame(this.updateTimelinePosition)
+        }
+      }
     },
 
     handleTimeUpdate() {
+      // We don't need to update position here anymore as it's handled by requestAnimationFrame
       const video = this.$refs.videoPlayer
       this.currentTime = video.currentTime
-      this.updateTimelinePosition()
       this.currentThumbnailIndex = Math.floor((this.currentTime / this.duration) * this.thumbnails.length)
     },
 
@@ -299,6 +320,10 @@ export default {
 
   beforeUnmount() {
     window.removeEventListener('keydown', this.handleKeyPress)
+    // Clean up animation frame
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId)
+    }
   },
 
   watch: {
