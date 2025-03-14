@@ -33,9 +33,20 @@
         <div v-if="!selectedVideo" class="no-video-message">
           Select a video from the sidebar to start
         </div>
-        <video v-else ref="videoPlayer" class="video-player">
-          <source :src="selectedVideo.path" type="video/mp4">
-        </video>
+        <div v-else class="video-wrapper">
+          <video ref="videoPlayer" class="video-player">
+            <source :src="selectedVideo.path" type="video/mp4">
+          </video>
+          <div class="video-overlay" 
+               ref="videoOverlay"
+               @click="handleVideoClick">
+            <div v-for="(point, index) in currentFramePoints" 
+                 :key="index" 
+                 class="point-marker"
+                 :style="{ left: point.x + 'px', top: point.y + 'px' }">
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Video controls and timeline -->
@@ -95,7 +106,16 @@ export default {
       timelinePosition: 0,
       isDragging: false,
       isScrubbing: false,
-      animationFrameId: null
+      animationFrameId: null,
+      framePoints: {}, // Object to store points by frame time
+    }
+  },
+
+  computed: {
+    currentFramePoints() {
+      // Get points for current frame time (rounded to 2 decimal places)
+      const frameTime = Math.round(this.currentTime * 100) / 100
+      return this.framePoints[frameTime] || []
     }
   },
 
@@ -139,6 +159,9 @@ export default {
         cancelAnimationFrame(this.animationFrameId)
         this.animationFrameId = null
       }
+      
+      // Clear all points when changing video
+      this.framePoints = {}
       
       // Wait for the video to be loaded in the DOM
       this.$nextTick(() => {
@@ -302,7 +325,28 @@ export default {
 
     stopScrubbing() {
       this.isScrubbing = false
-    }
+    },
+
+    handleVideoClick(event) {
+      const overlay = this.$refs.videoOverlay
+      const rect = overlay.getBoundingClientRect()
+      const x = event.clientX - rect.left
+      const y = event.clientY - rect.top
+      
+      // Get current frame time (rounded to 2 decimal places)
+      const frameTime = Math.round(this.currentTime * 100) / 100
+      
+      // Initialize array for this frame if it doesn't exist
+      if (!this.framePoints[frameTime]) {
+        this.framePoints[frameTime] = []
+      }
+      
+      // Add point to the current frame
+      this.framePoints[frameTime].push({ x, y })
+      
+      // Log coordinates with frame time
+      console.log(`Point added at x: ${x}, y: ${y} at frame time: ${frameTime}`)
+    },
   },
 
   mounted() {
@@ -460,6 +504,35 @@ export default {
   align-items: center;
   background: #000;
   overflow: hidden;
+}
+
+.video-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+
+.point-marker {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background-color: red;
+  border: 2px solid white;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
 }
 
 .video-player {
