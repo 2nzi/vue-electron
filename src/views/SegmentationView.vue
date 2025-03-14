@@ -22,6 +22,23 @@
           <div v-else-if="inputFolder" class="empty-message">
             No videos found in this folder
           </div>
+
+          <!-- Objects Management Section -->
+          <div class="section-header" style="margin-top: 20px;">
+            <span class="section-title">Objects</span>
+          </div>
+          <div class="objects-list">
+            <div v-for="(object, index) in objects" 
+                 :key="index"
+                 class="object-item"
+                 :class="{ 'selected': selectedObjectIndex === index }"
+                 @click="selectObject(index)">
+              {{ object.name }}
+            </div>
+            <button class="action-button" @click="addNewObject" style="margin-top: 10px;">
+              Add New Object
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -78,12 +95,14 @@
         </div>
       </div>
 
-      <!-- Object timeline -->
-      <div class="object-timeline" v-if="selectedVideo">
-        <div class="object-track">
-          <div class="track-label">Object 1</div>
+      <!-- Object timelines -->
+      <div class="object-timelines" v-if="selectedVideo">
+        <div v-for="(object, index) in objects" 
+             :key="index"
+             class="object-track">
+          <div class="track-label">{{ object.name }}</div>
           <div class="track-content">
-            <div v-for="time in Object.keys(framePoints)" 
+            <div v-for="time in getObjectPoints(index)" 
                  :key="time"
                  class="track-marker"
                  :style="{ left: (time / duration * 100) + '%' }"
@@ -114,15 +133,18 @@ export default {
       isDragging: false,
       isScrubbing: false,
       animationFrameId: null,
-      framePoints: {}, // Object to store points by frame time
+      objects: [
+        { name: 'Object 1', points: {} }
+      ],
+      selectedObjectIndex: 0,
     }
   },
 
   computed: {
     currentFramePoints() {
-      // Get points for current frame time (rounded to 2 decimal places)
       const frameTime = Math.round(this.currentTime * 100) / 100
-      return this.framePoints[frameTime] || []
+      const currentObject = this.objects[this.selectedObjectIndex]
+      return currentObject?.points[frameTime] || []
     }
   },
 
@@ -168,7 +190,7 @@ export default {
       }
       
       // Clear all points when changing video
-      this.framePoints = {}
+      this.objects = [{ name: 'Object 1', points: {} }]
       
       // Wait for the video to be loaded in the DOM
       this.$nextTick(() => {
@@ -343,21 +365,40 @@ export default {
       // Get current frame time (rounded to 2 decimal places)
       const frameTime = Math.round(this.currentTime * 100) / 100
       
+      // Get current object
+      const currentObject = this.objects[this.selectedObjectIndex]
+      
       // Initialize array for this frame if it doesn't exist
-      if (!this.framePoints[frameTime]) {
-        this.framePoints[frameTime] = []
+      if (!currentObject.points[frameTime]) {
+        currentObject.points[frameTime] = []
       }
       
-      // Add point to the current frame
-      this.framePoints[frameTime].push({ x, y })
+      // Add point to the current frame for the selected object
+      currentObject.points[frameTime].push({ x, y })
       
-      // Log coordinates with frame time
-      console.log(`Point added at x: ${x}, y: ${y} at frame time: ${frameTime}`)
+      // Log coordinates with frame time and object
+      console.log(`Point added at x: ${x}, y: ${y} at frame time: ${frameTime} for ${currentObject.name}`)
     },
 
     isCurrentFrame(time) {
       const currentFrameTime = Math.round(this.currentTime * 100) / 100
       return Math.abs(currentFrameTime - parseFloat(time)) < 0.01
+    },
+
+    addNewObject() {
+      const newIndex = this.objects.length + 1
+      this.objects.push({
+        name: `Object ${newIndex}`,
+        points: {}
+      })
+    },
+
+    selectObject(index) {
+      this.selectedObjectIndex = index
+    },
+
+    getObjectPoints(objectIndex) {
+      return Object.keys(this.objects[objectIndex]?.points || {})
     },
   },
 
@@ -497,6 +538,7 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
 }
 
 .no-video-message {
@@ -508,9 +550,9 @@ export default {
   font-size: 16px;
 }
 
-/* Existing styles remain unchanged */
 .video-container {
-  flex: 1;
+  height: 60%;
+  min-height: 400px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -554,6 +596,7 @@ export default {
 
 .video-controls {
   height: 60px;
+  min-height: 60px;
   background: #1a1a1a;
   border-top: 1px solid #333;
   padding: 10px 15px;
@@ -563,6 +606,7 @@ export default {
 }
 
 .play-button {
+  min-width: 40px;
   width: 40px;
   height: 40px;
   border: none;
@@ -573,6 +617,7 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .timeline {
@@ -662,45 +707,95 @@ export default {
   transition: opacity 0.2s ease;
 }
 
-.object-timeline {
-  height: 60px;
+.objects-list {
+  margin-top: 10px;
+}
+
+.object-item {
+  padding: 8px 12px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 13px;
+  border-bottom: 1px solid #333;
+}
+
+.object-item:hover {
+  background: #2a2a2a;
+}
+
+.object-item.selected {
+  background: #2a2a2a;
+  border-left: 2px solid #4CAF50;
+}
+
+.object-timelines {
+  flex: 1;
   background: #1a1a1a;
   border-top: 1px solid #333;
   padding: 10px 15px;
+  overflow-y: auto;
+  max-height: calc(40% - 60px);
 }
 
 .object-track {
   display: flex;
   align-items: center;
-  height: 100%;
+  height: 40px;
+  min-height: 40px;
   gap: 15px;
+  width: 100%;
+}
+
+.object-track + .object-track {
+  margin-top: 10px;
 }
 
 .track-label {
+  min-width: 40px;
   width: 40px;
   color: white;
   font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .track-content {
   flex: 1;
   height: 30px;
-  background: #2a2a2a;
-  border-radius: 4px;
   position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.track-content::before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: #2196f3;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .track-marker {
   position: absolute;
-  width: 4px;
-  height: 100%;
-  background: #4CAF50;
-  transform: translateX(-50%);
-  transition: background-color 0.2s ease;
+  width: 12px;
+  height: 12px;
+  background: #2196f3;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  top: 50%;
+  transition: all 0.2s ease;
+  z-index: 1;
 }
 
 .track-marker.active {
-  background: #FFC107;
-  box-shadow: 0 0 8px rgba(255, 193, 7, 0.5);
+  background: #FFA500;
+  box-shadow: 0 0 8px rgba(255, 165, 0, 0.5);
+  width: 14px;
+  height: 14px;
 }
 </style>
