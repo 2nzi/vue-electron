@@ -741,8 +741,8 @@ export default {
 .object-track {
   display: flex;
   align-items: center;
-  height: 40px;
-  min-height: 40px;
+  height: 20px;
+  min-height: 20px;
   gap: 15px;
   width: 100%;
 }
@@ -755,14 +755,13 @@ export default {
   min-width: 40px;
   width: 40px;
   color: white;
-  font-size: 14px;
+  font-size: 10px;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .track-content {
   flex: 1;
-  height: 30px;
   position: relative;
   display: flex;
   align-items: center;
