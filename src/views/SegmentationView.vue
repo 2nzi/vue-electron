@@ -62,12 +62,8 @@
           <div class="timeline-cursor-container" :style="{ left: timelinePosition + '%' }">
             <div class="timeline-cursor-line"></div>
             <div class="timeline-cursor-handle"></div>
-            <div class="timeline-cursor-time">{{ formatTimeWithMs(currentTime) }}</div>
+            <div class="timeline-cursor-time" v-if="duration > 0">{{ formatTimeWithMs(currentTime) }}</div>
           </div>
-        </div>
-
-        <div class="time-display">
-          {{ formatTimeWithMs(currentTime) }} / {{ formatTime(duration) }}
         </div>
       </div>
 
@@ -171,10 +167,9 @@ export default {
     },
 
     formatTimeWithMs(seconds) {
-      const mins = Math.floor(seconds / 60)
-      const secs = Math.floor(seconds % 60)
-      const ms = Math.floor((seconds % 1) * 10)
-      return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`
+      const secs = Math.floor(seconds)
+      const cs = Math.floor((seconds % 1) * 100)
+      return `${secs}:${cs.toString().padStart(2, '0')}`
     },
 
     updateTimelinePosition() {
@@ -279,6 +274,8 @@ export default {
       const video = this.$refs.videoPlayer
       if (video) {
         video.currentTime = this.currentTime
+        // Force update the display
+        this.$forceUpdate()
       }
     },
 
@@ -289,6 +286,15 @@ export default {
 
   mounted() {
     window.addEventListener('keydown', this.handleKeyPress)
+    
+    // Set default folder and load videos
+    this.inputFolder = "C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw"
+    this.loadVideos().then(() => {
+      // Select first video if available
+      if (this.videos.length > 0) {
+        this.selectVideo(this.videos[0])
+      }
+    })
   },
 
   beforeUnmount() {
@@ -440,7 +446,7 @@ export default {
   height: 60px;
   background: #1a1a1a;
   border-top: 1px solid #333;
-  padding: 10px;
+  padding: 10px 15px;
   display: flex;
   align-items: center;
   gap: 15px;
@@ -461,7 +467,7 @@ export default {
 
 .timeline {
   flex: 1;
-  height: 80px;
+  height: 40px;
   background: rgba(0, 0, 0, 0.3);
   position: relative;
   cursor: pointer;
@@ -531,45 +537,37 @@ export default {
 
 .timeline-cursor-time {
   position: absolute;
-  top: -25px;
+  top: 25%;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.8);
   color: white;
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
   font-family: monospace;
   white-space: nowrap;
-}
-
-.time-display {
-  min-width: 140px;
-  color: white;
-  font-family: monospace;
-  font-size: 14px;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 4px 8px;
-  border-radius: 4px;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.2s ease;
 }
 
 .object-timeline {
   height: 60px;
   background: #1a1a1a;
   border-top: 1px solid #333;
-  padding: 10px;
+  padding: 10px 15px;
 }
 
 .object-track {
   display: flex;
   align-items: center;
   height: 100%;
-  gap: 10px;
+  gap: 15px;
 }
 
 .track-label {
-  width: 80px;
+  width: 40px;
   color: white;
   font-size: 14px;
 }
