@@ -95,15 +95,31 @@
           Select a video from the sidebar to start
         </div>
         <div v-else class="video-wrapper">
-          <video ref="videoPlayer" class="video-player">
-            <source :src="selectedVideo.path" type="video/mp4">
+          <video 
+            ref="videoPlayer" 
+            class="video-player" 
+            :src="selectedVideo.path" 
+            preload="metadata"
+            @click="handleVideoClick">
           </video>
+          
+          <!-- Afficher tous les masques avec des opacités différentes -->
+          <div v-for="(object, index) in objects" :key="'mask-'+index" class="segmentation-mask"
+               :style="{ 
+                 backgroundImage: object.masks && object.masks[Math.round(currentTime * 100) / 100] ? 
+                   `url(${object.masks[Math.round(currentTime * 100) / 100]})` : 'none',
+                 opacity: index === selectedObjectIndex ? 0.7 : 0.3,
+                 filter: `hue-rotate(${index * 40}deg)` 
+               }">
+          </div>
+          
           <div class="video-overlay" 
                ref="videoOverlay"
                @mousedown="startDrawing"
                @mousemove="drawing"
                @mouseup="endDrawing"
                @mouseleave="endDrawing">
+            <!-- Points display -->
             <div v-for="(point, index) in visiblePoints" 
                  :key="'point-'+index" 
                  class="point-marker"
@@ -114,21 +130,14 @@
                    borderColor: 'white'
                  }">
             </div>
-            <div v-if="drawingRect"
-                 class="rectangle-marker"
+            <!-- Rectangle en cours de dessin -->
+            <div v-if="drawingRect" class="rectangle-marker"
                  :style="{
-                   left: `${drawingRect.x}px`,
-                   top: `${drawingRect.y}px`,
-                   width: `${drawingRect.width}px`,
-                   height: `${drawingRect.height}px`,
+                   left: drawingRect.x + 'px',
+                   top: drawingRect.y + 'px',
+                   width: drawingRect.width + 'px',
+                   height: drawingRect.height + 'px',
                    borderColor: objects[selectedObjectIndex].color
-                 }">
-            </div>
-            <div v-if="currentFrameMask" 
-                 class="segmentation-mask" 
-                 :style="{
-                   backgroundImage: `url(${currentFrameMask})`,
-                   opacity: 0.5
                  }">
             </div>
           </div>
@@ -239,12 +248,6 @@ export default {
     visiblePoints() {
       return this.currentFramePoints.filter(point => !point.isTimelineMarker)
     },
-
-    currentFrameMask() {
-      const frameTime = Math.round(this.currentTime * 100) / 100
-      const currentObject = this.objects[this.selectedObjectIndex]
-      return currentObject?.masks?.[frameTime]
-    }
   },
 
   methods: {
@@ -1259,6 +1262,7 @@ export default {
   background-position: center;
   background-repeat: no-repeat;
   pointer-events: none;
+  mix-blend-mode: screen;
 }
 
 .drawing-modes {
