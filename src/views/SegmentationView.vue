@@ -81,7 +81,7 @@
                @mousemove="drawing"
                @mouseup="endDrawing"
                @mouseleave="endDrawing">
-            <div v-for="(point, index) in currentFramePoints" 
+            <div v-for="(point, index) in visiblePoints" 
                  :key="'point-'+index" 
                  class="point-marker"
                  :style="{ 
@@ -210,6 +210,11 @@ export default {
       const currentObject = this.objects[this.selectedObjectIndex]
       return currentObject?.points[frameTime] || []
     },
+    
+    visiblePoints() {
+      return this.currentFramePoints.filter(point => !point.isTimelineMarker)
+    },
+
     currentFrameMask() {
       const frameTime = Math.round(this.currentTime * 100) / 100
       const currentObject = this.objects[this.selectedObjectIndex]
@@ -503,7 +508,6 @@ export default {
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'))
         const formData = new FormData()
         formData.append('file', blob, 'frame.jpg')
-        // Envoyer la bbox dans le format attendu par l'API
         formData.append('bbox', JSON.stringify({
           x: realRect.x,
           y: realRect.y,
@@ -527,47 +531,18 @@ export default {
             currentObject.masks = {}
           }
           
-          // Combiner le nouveau masque avec l'ancien s'il existe
+          // Pour le rectangle, on remplace simplement le masque existant
           const newMaskUrl = `data:image/png;base64,${data.masks[0]}`
+          currentObject.masks[frameTime] = newMaskUrl
           
-          if (currentObject.masks[frameTime]) {
-            // Créer un canvas pour combiner les masques
-            const combineCanvas = document.createElement('canvas')
-            const ctx = combineCanvas.getContext('2d')
-            
-            // Charger l'ancien masque
-            const oldMask = new Image()
-            oldMask.src = currentObject.masks[frameTime]
-            
-            // Charger le nouveau masque
-            const newMask = new Image()
-            newMask.src = newMaskUrl
-            
-            // Attendre que les deux images soient chargées
-            await Promise.all([
-              new Promise(resolve => oldMask.onload = resolve),
-              new Promise(resolve => newMask.onload = resolve)
-            ])
-            
-            // Configurer le canvas
-            combineCanvas.width = video.videoWidth
-            combineCanvas.height = video.videoHeight
-            
-            // Dessiner l'ancien masque
-            ctx.drawImage(oldMask, 0, 0)
-            
-            // Combiner avec le nouveau masque
-            ctx.globalCompositeOperation = 'lighter'
-            ctx.drawImage(newMask, 0, 0)
-            
-            // Convertir le canvas combiné en URL data
-            currentObject.masks[frameTime] = combineCanvas.toDataURL('image/png')
-            
-            console.log('Masks combined for frame:', frameTime)
-          } else {
-            // S'il n'y a pas de masque précédent, utiliser le nouveau directement
-            currentObject.masks[frameTime] = newMaskUrl
+          // Ajouter un point dans la timeline pour marquer la segmentation
+          if (!currentObject.points[frameTime]) {
+            currentObject.points[frameTime] = []
           }
+          // On ajoute un point "virtuel" pour la timeline
+          currentObject.points[frameTime].push({ isTimelineMarker: true })
+          
+          console.log('Rectangle mask set for frame:', frameTime)
         }
 
       } catch (error) {
@@ -615,7 +590,7 @@ export default {
         formData.append('file', blob, 'frame.jpg')
         formData.append('points', JSON.stringify([[realX, realY]]))
 
-        const response = await fetch('http://localhost:8000/segment_point', {
+        const response = await fetch('http://localhost:8000/segment', {
           method: 'POST',
           body: formData
         })
@@ -699,7 +674,12 @@ export default {
     },
 
     getObjectPoints(objectIndex) {
-      return Object.keys(this.objects[objectIndex]?.points || {})
+      const object = this.objects[objectIndex]
+      return Object.keys(object.points || {}).filter(time => {
+        // Retourner true si le tableau de points n'est pas vide
+        // ou s'il contient un marqueur de timeline
+        return object.points[time].length > 0
+      })
     },
   },
 
