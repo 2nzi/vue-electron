@@ -31,7 +31,11 @@
             <div v-for="(object, index) in objects" 
                  :key="index"
                  class="object-item"
-                 :class="{ 'selected': selectedObjectIndex === index }">
+                 :class="{ 'selected': selectedObjectIndex === index }"
+                 :style="selectedObjectIndex === index ? { 
+                   backgroundColor: object.color,
+                   opacity: 0.8
+                 } : {}">
               <div class="object-content" @click="selectObject(index)">
                 {{ object.name }}
               </div>
@@ -1069,6 +1073,11 @@ export default {
   border-radius: 4px;
   background: #2a2a2a;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.object-item.selected {
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
 }
 
 .object-content {
@@ -1081,10 +1090,10 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 0, 0, 0.2);
+  background: rgba(255, 255, 255, 0.2);
   border: none;
   border-radius: 50%;
-  color: #ff4444;
+  color: #ffffff;
   font-size: 16px;
   cursor: pointer;
   margin-left: 8px;
@@ -1096,10 +1105,6 @@ export default {
 .delete-button:hover {
   background: rgba(255, 0, 0, 0.4);
   transform: scale(1.1);
-}
-
-.object-item.selected {
-  background: #3a3a3a;
 }
 
 .object-timelines {
