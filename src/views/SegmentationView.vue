@@ -39,6 +39,27 @@
               Add New Object
             </button>
           </div>
+
+          <!-- Drawing Mode Section -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Drawing Mode</span>
+            </div>
+            <div class="drawing-modes">
+              <button 
+                class="mode-button" 
+                :class="{ active: drawingMode === 'point' }"
+                @click="drawingMode = 'point'">
+                Point
+              </button>
+              <button 
+                class="mode-button" 
+                :class="{ active: drawingMode === 'rectangle' }"
+                @click="drawingMode = 'rectangle'">
+                Rectangle
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -56,7 +77,10 @@
           </video>
           <div class="video-overlay" 
                ref="videoOverlay"
-               @click="handleVideoClick">
+               @mousedown="startDrawing"
+               @mousemove="drawing"
+               @mouseup="endDrawing"
+               @mouseleave="endDrawing">
             <div v-for="(point, index) in currentFramePoints" 
                  :key="'point-'+index" 
                  class="point-marker"
@@ -65,6 +89,16 @@
                    top: point.y + 'px',
                    backgroundColor: objects[selectedObjectIndex].color,
                    borderColor: 'white'
+                 }">
+            </div>
+            <div v-if="drawingRect"
+                 class="rectangle-marker"
+                 :style="{
+                   left: `${drawingRect.x}px`,
+                   top: `${drawingRect.y}px`,
+                   width: `${drawingRect.width}px`,
+                   height: `${drawingRect.height}px`,
+                   borderColor: objects[selectedObjectIndex].color
                  }">
             </div>
             <div v-if="currentFrameMask" 
@@ -163,6 +197,10 @@ export default {
       ],
       selectedObjectIndex: 0,
       masks: {}, // Pour stocker les masques par frame et par objet
+      drawingMode: 'point', // 'point' ou 'rectangle'
+      isDrawing: false,
+      drawingRect: null,
+      startPoint: null,
     }
   },
 
@@ -387,6 +425,156 @@ export default {
       this.isScrubbing = false
     },
 
+    startDrawing(event) {
+      if (this.drawingMode === 'rectangle') {
+        this.isDrawing = true
+        const rect = this.$refs.videoOverlay.getBoundingClientRect()
+        this.startPoint = {
+          x: event.clientX - rect.left,
+          y: event.clientY - rect.top
+        }
+        this.drawingRect = {
+          x: this.startPoint.x,
+          y: this.startPoint.y,
+          width: 0,
+          height: 0
+        }
+      } else {
+        this.handleVideoClick(event)
+      }
+    },
+
+    drawing(event) {
+      if (!this.isDrawing || this.drawingMode !== 'rectangle') return
+      
+      const rect = this.$refs.videoOverlay.getBoundingClientRect()
+      const currentX = event.clientX - rect.left
+      const currentY = event.clientY - rect.top
+      
+      this.drawingRect = {
+        x: Math.min(this.startPoint.x, currentX),
+        y: Math.min(this.startPoint.y, currentY),
+        width: Math.abs(currentX - this.startPoint.x),
+        height: Math.abs(currentY - this.startPoint.y)
+      }
+    },
+
+    async endDrawing() {
+      if (!this.isDrawing || this.drawingMode !== 'rectangle') return
+      
+      this.isDrawing = false
+      if (this.drawingRect.width < 5 || this.drawingRect.height < 5) {
+        this.drawingRect = null
+        return
+      }
+      
+      await this.handleRectangleSegmentation(this.drawingRect)
+      this.drawingRect = null
+    },
+
+    async handleRectangleSegmentation(rect) {
+      const video = this.$refs.videoPlayer
+      const overlay = this.$refs.videoOverlay
+      const overlayRect = overlay.getBoundingClientRect()
+      
+      // Conversion en coordonnées réelles
+      const scaleX = video.videoWidth / overlayRect.width
+      const scaleY = video.videoHeight / overlayRect.height
+      
+      const realRect = {
+        x: Math.round(rect.x * scaleX),
+        y: Math.round(rect.y * scaleY),
+        width: Math.round(rect.width * scaleX),
+        height: Math.round(rect.height * scaleY)
+      }
+
+      console.log('Real rectangle coordinates:', realRect)
+
+      const frameTime = Math.round(this.currentTime * 100) / 100
+      const currentObject = this.objects[this.selectedObjectIndex]
+
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0)
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'))
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+        // Envoyer la bbox dans le format attendu par l'API
+        formData.append('bbox', JSON.stringify({
+          x: realRect.x,
+          y: realRect.y,
+          width: realRect.width,
+          height: realRect.height
+        }))
+
+        const response = await fetch('http://localhost:8000/segment/bbox', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) throw new Error('Erreur de segmentation')
+
+        const data = await response.json()
+
+        // Convertir le masque base64 en URL data
+        if (data.masks && data.masks.length > 0) {
+          // Initialiser l'objet masks si nécessaire
+          if (!currentObject.masks) {
+            currentObject.masks = {}
+          }
+          
+          // Combiner le nouveau masque avec l'ancien s'il existe
+          const newMaskUrl = `data:image/png;base64,${data.masks[0]}`
+          
+          if (currentObject.masks[frameTime]) {
+            // Créer un canvas pour combiner les masques
+            const combineCanvas = document.createElement('canvas')
+            const ctx = combineCanvas.getContext('2d')
+            
+            // Charger l'ancien masque
+            const oldMask = new Image()
+            oldMask.src = currentObject.masks[frameTime]
+            
+            // Charger le nouveau masque
+            const newMask = new Image()
+            newMask.src = newMaskUrl
+            
+            // Attendre que les deux images soient chargées
+            await Promise.all([
+              new Promise(resolve => oldMask.onload = resolve),
+              new Promise(resolve => newMask.onload = resolve)
+            ])
+            
+            // Configurer le canvas
+            combineCanvas.width = video.videoWidth
+            combineCanvas.height = video.videoHeight
+            
+            // Dessiner l'ancien masque
+            ctx.drawImage(oldMask, 0, 0)
+            
+            // Combiner avec le nouveau masque
+            ctx.globalCompositeOperation = 'lighter'
+            ctx.drawImage(newMask, 0, 0)
+            
+            // Convertir le canvas combiné en URL data
+            currentObject.masks[frameTime] = combineCanvas.toDataURL('image/png')
+            
+            console.log('Masks combined for frame:', frameTime)
+          } else {
+            // S'il n'y a pas de masque précédent, utiliser le nouveau directement
+            currentObject.masks[frameTime] = newMaskUrl
+          }
+        }
+
+      } catch (error) {
+        console.error('Erreur lors de la segmentation:', error)
+      }
+    },
+
     async handleVideoClick(event) {
       const overlay = this.$refs.videoOverlay
       const video = this.$refs.videoPlayer
@@ -427,7 +615,7 @@ export default {
         formData.append('file', blob, 'frame.jpg')
         formData.append('points', JSON.stringify([[realX, realY]]))
 
-        const response = await fetch('http://localhost:8000/segment', {
+        const response = await fetch('http://localhost:8000/segment_point', {
           method: 'POST',
           body: formData
         })
@@ -919,6 +1107,35 @@ export default {
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.drawing-modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.mode-button {
+  flex: 1;
+  padding: 8px;
+  background: #2a2a2a;
+  border: 1px solid #333;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-button.active {
+  background: #4CAF50;
+  border-color: #45a049;
+}
+
+.rectangle-marker {
+  position: absolute;
+  border: 2px solid;
+  background: rgba(255, 255, 255, 0.1);
   pointer-events: none;
 }
 </style>
