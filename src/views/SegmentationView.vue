@@ -48,15 +48,15 @@
             <div class="drawing-modes">
               <button 
                 class="mode-button" 
-                :class="{ active: drawingMode === 'point' }"
-                @click="drawingMode = 'point'">
-                Point
-              </button>
-              <button 
-                class="mode-button" 
                 :class="{ active: drawingMode === 'rectangle' }"
                 @click="drawingMode = 'rectangle'">
                 Rectangle
+              </button>
+              <button 
+                class="mode-button" 
+                :class="{ active: drawingMode === 'point' }"
+                @click="drawingMode = 'point'">
+                Point
               </button>
             </div>
           </div>
@@ -198,7 +198,7 @@ export default {
       ],
       selectedObjectIndex: 0,
       masks: {}, // Pour stocker les masques par frame et par objet
-      drawingMode: 'point', // 'point' ou 'rectangle'
+      drawingMode: 'rectangle', // 'point' ou 'rectangle'
       isDrawing: false,
       drawingRect: null,
       startPoint: null,
@@ -690,6 +690,34 @@ export default {
         this.currentTime = time
         this.timelinePosition = (time / this.duration) * 100
         console.log('Seeking to time:', time)
+      }
+    },
+
+    handleKeyPress(event) {
+      if (event.key === 'Delete') {
+        this.deleteCurrentFrameData()
+      }
+    },
+
+    deleteCurrentFrameData() {
+      const frameTime = Math.round(this.currentTime * 100) / 100
+      const currentObject = this.objects[this.selectedObjectIndex]
+      
+      if (currentObject && this.isCurrentFrame(frameTime)) {
+        console.log('Deleting data for frame:', frameTime, 'object:', currentObject.name)
+        
+        // Supprimer les points
+        if (currentObject.points) {
+          delete currentObject.points[frameTime]
+        }
+        
+        // Supprimer le masque
+        if (currentObject.masks) {
+          delete currentObject.masks[frameTime]
+        }
+        
+        // Forcer la mise à jour de la vue
+        this.$forceUpdate()
       }
     },
   },
