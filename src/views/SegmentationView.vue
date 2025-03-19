@@ -70,6 +70,19 @@
               </button>
             </div>
           </div>
+
+          <!-- Auto Detection Section -->
+          <div class="section">
+            <div class="section-header">
+              <span class="section-title">Auto Detection</span>
+            </div>
+            <button 
+              class="action-button"
+              @click="detectPersons"
+              :disabled="hasUsedAutoDetection">
+              Detect Persons
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -212,6 +225,7 @@ export default {
       isDrawing: false,
       drawingRect: null,
       startPoint: null,
+      hasUsedAutoDetection: false, // Pour ne permettre qu'une seule utilisation
     }
   },
 
@@ -753,6 +767,60 @@ export default {
       
       console.log('Object deleted and remaining objects renamed')
     },
+
+    async detectPersons() {
+      if (this.hasUsedAutoDetection) {
+        console.warn('Auto detection can only be used once')
+        return
+      }
+
+      const video = this.$refs.videoPlayer
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(video, 0, 0)
+
+      try {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'))
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+
+        const response = await fetch('http://localhost:8000/detect-and-segment/persons/', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) throw new Error('Erreur de détection')
+
+        const data = await response.json()
+        const frameTime = Math.round(this.currentTime * 100) / 100
+
+        // Créer un nouvel objet pour chaque personne détectée
+        data.detections.forEach((detection, index) => {
+          const newObject = {
+            name: `Person ${this.objects.length + index + 1}`,
+            points: {},
+            masks: {},
+            color: this.predefinedColors[(this.objects.length + index) % this.predefinedColors.length]
+          }
+
+          // Ajouter un point virtuel pour la timeline
+          newObject.points[frameTime] = [{ isTimelineMarker: true }]
+          
+          // Ajouter le masque
+          newObject.masks[frameTime] = `data:image/png;base64,${detection.mask}`
+
+          this.objects.push(newObject)
+        })
+
+        this.hasUsedAutoDetection = true
+        console.log(`Added ${data.detections.length} new person objects`)
+
+      } catch (error) {
+        console.error('Erreur lors de la détection des personnes:', error)
+      }
+    },
   },
 
   mounted() {
@@ -1220,5 +1288,10 @@ export default {
   border: 2px solid;
   background: rgba(255, 255, 255, 0.1);
   pointer-events: none;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
