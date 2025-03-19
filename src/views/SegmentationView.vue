@@ -153,7 +153,8 @@
                    left: (time / duration * 100) + '%',
                    backgroundColor: object.color
                  }"
-                 :class="{ 'active': isCurrentFrame(time) }">
+                 :class="{ 'active': isCurrentFrame(time) }"
+                 @click="seekToTime(parseFloat(time))">
             </div>
           </div>
         </div>
@@ -681,6 +682,16 @@ export default {
         return object.points[time].length > 0
       })
     },
+
+    seekToTime(time) {
+      const video = this.$refs.videoPlayer
+      if (video) {
+        video.currentTime = time
+        this.currentTime = time
+        this.timelinePosition = (time / this.duration) * 100
+        console.log('Seeking to time:', time)
+      }
+    },
   },
 
   mounted() {
@@ -1070,6 +1081,12 @@ export default {
   top: 50%;
   transition: all 0.2s ease;
   z-index: 1;
+  cursor: pointer;
+}
+
+.track-marker:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+  box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
 }
 
 .track-marker.active {
