@@ -31,9 +31,15 @@
             <div v-for="(object, index) in objects" 
                  :key="index"
                  class="object-item"
-                 :class="{ 'selected': selectedObjectIndex === index }"
-                 @click="selectObject(index)">
-              {{ object.name }}
+                 :class="{ 'selected': selectedObjectIndex === index }">
+              <div class="object-content" @click="selectObject(index)">
+                {{ object.name }}
+              </div>
+              <button class="delete-button" 
+                      @click="deleteObject(index)"
+                      v-if="objects.length > 1">
+                ×
+              </button>
             </div>
             <button class="action-button" @click="addNewObject" style="margin-top: 10px;">
               Add New Object
@@ -662,11 +668,11 @@ export default {
 
     addNewObject() {
       const newIndex = this.objects.length
-      const colorIndex = newIndex % this.predefinedColors.length
       this.objects.push({
         name: `Object ${newIndex + 1}`,
         points: {},
-        color: this.predefinedColors[colorIndex]
+        color: this.predefinedColors[newIndex % this.predefinedColors.length],
+        masks: {}
       })
     },
 
@@ -719,6 +725,29 @@ export default {
         // Forcer la mise à jour de la vue
         this.$forceUpdate()
       }
+    },
+
+    deleteObject(index) {
+      if (this.objects.length <= 1) {
+        console.warn('Cannot delete the last object')
+        return
+      }
+
+      // Supprimer l'objet
+      this.objects.splice(index, 1)
+
+      // Renommer les objets restants et réattribuer les couleurs
+      this.objects.forEach((obj, i) => {
+        obj.name = `Object ${i + 1}`
+        obj.color = this.predefinedColors[i % this.predefinedColors.length]
+      })
+
+      // Ajuster l'index sélectionné si nécessaire
+      if (this.selectedObjectIndex >= this.objects.length) {
+        this.selectedObjectIndex = this.objects.length - 1
+      }
+      
+      console.log('Object deleted and remaining objects renamed')
     },
   },
 
@@ -1032,21 +1061,45 @@ export default {
 }
 
 .object-item {
-  padding: 8px 12px;
-  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px;
+  margin: 4px 0;
+  border-radius: 4px;
+  background: #2a2a2a;
   cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 13px;
-  border-bottom: 1px solid #333;
 }
 
-.object-item:hover {
-  background: #2a2a2a;
+.object-content {
+  flex-grow: 1;
+}
+
+.delete-button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 0, 0, 0.2);
+  border: none;
+  border-radius: 50%;
+  color: #ff4444;
+  font-size: 16px;
+  cursor: pointer;
+  margin-left: 8px;
+  padding: 0;
+  line-height: 1;
+  transition: all 0.2s ease;
+}
+
+.delete-button:hover {
+  background: rgba(255, 0, 0, 0.4);
+  transform: scale(1.1);
 }
 
 .object-item.selected {
-  background: #2a2a2a;
-  border-left: 2px solid #4CAF50;
+  background: #3a3a3a;
 }
 
 .object-timelines {
