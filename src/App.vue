@@ -33,4 +33,4 @@ export default {
 </style>
 
 
-<!-- npm run electron:serves -->
+<!-- npm run electron:serve -->

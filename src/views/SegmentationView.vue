@@ -58,9 +58,21 @@
                ref="videoOverlay"
                @click="handleVideoClick">
             <div v-for="(point, index) in currentFramePoints" 
-                 :key="index" 
+                 :key="'point-'+index" 
                  class="point-marker"
-                 :style="{ left: point.x + 'px', top: point.y + 'px' }">
+                 :style="{ 
+                   left: point.x + 'px', 
+                   top: point.y + 'px',
+                   backgroundColor: objects[selectedObjectIndex].color,
+                   borderColor: 'white'
+                 }">
+            </div>
+            <div v-if="currentFrameMask" 
+                 class="segmentation-mask" 
+                 :style="{
+                   backgroundImage: `url(${currentFrameMask})`,
+                   opacity: 0.5
+                 }">
             </div>
           </div>
         </div>
@@ -97,15 +109,16 @@
 
       <!-- Object timelines -->
       <div class="object-timelines" v-if="selectedVideo">
-        <div v-for="(object, index) in objects" 
-             :key="index"
-             class="object-track">
-          <div class="track-label">{{ object.name }}</div>
-          <div class="track-content">
+        <div class="object-track" v-for="(object, index) in objects" :key="index">
+          <div class="track-label" :style="{ color: object.color }">{{ object.name }}</div>
+          <div class="track-content" :style="{ '--track-color': object.color }">
             <div v-for="time in getObjectPoints(index)" 
                  :key="time"
                  class="track-marker"
-                 :style="{ left: (time / duration * 100) + '%' }"
+                 :style="{ 
+                   left: (time / duration * 100) + '%',
+                   backgroundColor: object.color
+                 }"
                  :class="{ 'active': isCurrentFrame(time) }">
             </div>
           </div>
@@ -133,10 +146,23 @@ export default {
       isDragging: false,
       isScrubbing: false,
       animationFrameId: null,
+      predefinedColors: [
+        '#3498db', // Bleu clair
+        '#2ecc71', // Vert émeraude
+        '#e74c3c', // Rouge corail
+        '#9b59b6', // Violet améthyste
+        '#f1c40f', // Jaune soleil
+        '#1abc9c', // Turquoise
+        '#e67e22', // Orange mandarine
+        '#34495e', // Bleu marine
+        '#27ae60', // Vert forêt
+        '#8e44ad'  // Violet royal
+      ],
       objects: [
-        { name: 'Object 1', points: {} }
+        { name: 'Object 1', points: {}, color: '#3498db' }
       ],
       selectedObjectIndex: 0,
+      masks: {}, // Pour stocker les masques par frame et par objet
     }
   },
 
@@ -145,6 +171,11 @@ export default {
       const frameTime = Math.round(this.currentTime * 100) / 100
       const currentObject = this.objects[this.selectedObjectIndex]
       return currentObject?.points[frameTime] || []
+    },
+    currentFrameMask() {
+      const frameTime = Math.round(this.currentTime * 100) / 100
+      const currentObject = this.objects[this.selectedObjectIndex]
+      return currentObject?.masks?.[frameTime]
     }
   },
 
@@ -190,7 +221,7 @@ export default {
       }
       
       // Clear all points when changing video
-      this.objects = [{ name: 'Object 1', points: {} }]
+      this.objects = [{ name: 'Object 1', points: {}, color: '#3498db' }]
       
       // Wait for the video to be loaded in the DOM
       this.$nextTick(() => {
@@ -356,28 +387,108 @@ export default {
       this.isScrubbing = false
     },
 
-    handleVideoClick(event) {
+    async handleVideoClick(event) {
       const overlay = this.$refs.videoOverlay
+      const video = this.$refs.videoPlayer
       const rect = overlay.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
       
-      // Get current frame time (rounded to 2 decimal places)
+      // Coordonnées dans l'interface
+      const viewportX = event.clientX - rect.left
+      const viewportY = event.clientY - rect.top
+      
+      // Conversion vers les coordonnées réelles de la vidéo
+      const scaleX = video.videoWidth / rect.width
+      const scaleY = video.videoHeight / rect.height
+      const realX = Math.round(viewportX * scaleX)
+      const realY = Math.round(viewportY * scaleY)
+      
+      console.log('Click coordinates (viewport):', { x: viewportX, y: viewportY })
+      console.log('Real coordinates:', { x: realX, y: realY })
+      
       const frameTime = Math.round(this.currentTime * 100) / 100
-      
-      // Get current object
       const currentObject = this.objects[this.selectedObjectIndex]
       
-      // Initialize array for this frame if it doesn't exist
+      // Stocker les coordonnées de l'interface pour l'affichage
       if (!currentObject.points[frameTime]) {
         currentObject.points[frameTime] = []
       }
-      
-      // Add point to the current frame for the selected object
-      currentObject.points[frameTime].push({ x, y })
-      
-      // Log coordinates with frame time and object
-      console.log(`Point added at x: ${x}, y: ${y} at frame time: ${frameTime} for ${currentObject.name}`)
+      currentObject.points[frameTime].push({ x: viewportX, y: viewportY })
+
+      try {
+        const canvas = document.createElement('canvas')
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0)
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'))
+
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+        formData.append('points', JSON.stringify([[realX, realY]]))
+
+        const response = await fetch('http://localhost:8000/segment', {
+          method: 'POST',
+          body: formData
+        })
+
+        if (!response.ok) throw new Error('Erreur de segmentation')
+
+        const data = await response.json()
+
+        // Convertir le masque base64 en URL data
+        if (data.masks && data.masks.length > 0) {
+          // Initialiser l'objet masks si nécessaire
+          if (!currentObject.masks) {
+            currentObject.masks = {}
+          }
+          
+          // Combiner le nouveau masque avec l'ancien s'il existe
+          const newMaskUrl = `data:image/png;base64,${data.masks[0]}`
+          
+          if (currentObject.masks[frameTime]) {
+            // Créer un canvas pour combiner les masques
+            const combineCanvas = document.createElement('canvas')
+            const ctx = combineCanvas.getContext('2d')
+            
+            // Charger l'ancien masque
+            const oldMask = new Image()
+            oldMask.src = currentObject.masks[frameTime]
+            
+            // Charger le nouveau masque
+            const newMask = new Image()
+            newMask.src = newMaskUrl
+            
+            // Attendre que les deux images soient chargées
+            await Promise.all([
+              new Promise(resolve => oldMask.onload = resolve),
+              new Promise(resolve => newMask.onload = resolve)
+            ])
+            
+            // Configurer le canvas
+            combineCanvas.width = video.videoWidth
+            combineCanvas.height = video.videoHeight
+            
+            // Dessiner l'ancien masque
+            ctx.drawImage(oldMask, 0, 0)
+            
+            // Combiner avec le nouveau masque en utilisant "destination-out"
+            ctx.globalCompositeOperation = 'lighter'
+            ctx.drawImage(newMask, 0, 0)
+            
+            // Convertir le canvas combiné en URL data
+            currentObject.masks[frameTime] = combineCanvas.toDataURL('image/png')
+            
+            console.log('Masks combined for frame:', frameTime)
+          } else {
+            // S'il n'y a pas de masque précédent, utiliser le nouveau directement
+            currentObject.masks[frameTime] = newMaskUrl
+          }
+        }
+
+      } catch (error) {
+        console.error('Erreur lors de la segmentation:', error)
+      }
     },
 
     isCurrentFrame(time) {
@@ -386,10 +497,12 @@ export default {
     },
 
     addNewObject() {
-      const newIndex = this.objects.length + 1
+      const newIndex = this.objects.length
+      const colorIndex = newIndex % this.predefinedColors.length
       this.objects.push({
-        name: `Object ${newIndex}`,
-        points: {}
+        name: `Object ${newIndex + 1}`,
+        points: {},
+        color: this.predefinedColors[colorIndex]
       })
     },
 
@@ -773,8 +886,9 @@ export default {
   content: '';
   position: absolute;
   width: 100%;
-  height: 2px;
-  background: #2196f3;
+  height: 1px;
+  background: var(--track-color);
+  opacity: 0.3;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -783,7 +897,6 @@ export default {
   position: absolute;
   width: 12px;
   height: 12px;
-  background: #2196f3;
   border-radius: 50%;
   transform: translate(-50%, -50%);
   top: 50%;
@@ -792,9 +905,20 @@ export default {
 }
 
 .track-marker.active {
-  background: #FFA500;
-  box-shadow: 0 0 8px rgba(255, 165, 0, 0.5);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
   width: 14px;
   height: 14px;
+}
+
+.segmentation-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
 }
 </style>
