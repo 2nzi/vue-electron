@@ -108,7 +108,7 @@
                :style="{ 
                  backgroundImage: object.masks && object.masks[Math.round(currentTime * 100) / 100] ? 
                    `url(${object.masks[Math.round(currentTime * 100) / 100]})` : 'none',
-                 opacity: index === selectedObjectIndex ? 0.7 : 0.3,
+                 opacity: index === selectedObjectIndex ? 0 : 0.6,
                  filter: `hue-rotate(${index * 40}deg)` 
                }">
           </div>
@@ -771,6 +771,19 @@ export default {
       console.log('Object deleted and remaining objects renamed')
     },
 
+    getNextPersonNumber() {
+      let maxNumber = 0;
+      this.objects.forEach(obj => {
+        if (obj.name.startsWith('Person ')) {
+          const num = parseInt(obj.name.split(' ')[1]);
+          if (!isNaN(num) && num > maxNumber) {
+            maxNumber = num;
+          }
+        }
+      });
+      return maxNumber + 1;
+    },
+
     async detectPersons() {
       if (this.hasUsedAutoDetection) {
         console.warn('Auto detection can only be used once')
@@ -800,25 +813,29 @@ export default {
         const frameTime = Math.round(this.currentTime * 100) / 100
 
         // Créer un nouvel objet pour chaque personne détectée
-        data.detections.forEach((detection, index) => {
+        data.detections.forEach((detection) => {
+          const newIndex = this.objects.length
+          // Créer un nouvel objet avec la structure complète
           const newObject = {
-            name: `Person ${this.objects.length + index + 1}`,
+            name: `Object ${newIndex + 1}`,
             points: {},
             masks: {},
-            color: this.predefinedColors[(this.objects.length + index) % this.predefinedColors.length]
+            color: this.predefinedColors[newIndex % this.predefinedColors.length]
           }
 
-          // Ajouter un point virtuel pour la timeline
-          newObject.points[frameTime] = [{ isTimelineMarker: true }]
-          
-          // Ajouter le masque
-          newObject.masks[frameTime] = `data:image/png;base64,${detection.mask}`
+          // Ajouter le masque pour le frame actuel
+          if (detection.mask) {
+            newObject.masks[frameTime] = `data:image/png;base64,${detection.mask}`
+            // Ajouter un point virtuel pour la timeline
+            newObject.points[frameTime] = [{ isTimelineMarker: true }]
+          }
 
+          // Ajouter le nouvel objet à la liste des objets
           this.objects.push(newObject)
         })
 
         this.hasUsedAutoDetection = true
-        console.log(`Added ${data.detections.length} new person objects`)
+        console.log(`Added ${data.detections.length} new objects`)
 
       } catch (error) {
         console.error('Erreur lors de la détection des personnes:', error)
