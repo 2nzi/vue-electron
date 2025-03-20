@@ -108,7 +108,7 @@
                :style="{ 
                  backgroundImage: object.masks && object.masks[Math.round(currentTime * 100) / 100] ? 
                    `url(${object.masks[Math.round(currentTime * 100) / 100]})` : 'none',
-                 opacity: index === selectedObjectIndex ? 0 : 0.6,
+                 opacity: index === selectedObjectIndex ? 0.5 : 0.6,
                  filter: `hue-rotate(${index * 40}deg)` 
                }">
           </div>
@@ -561,7 +561,47 @@ export default {
           
           // Pour le rectangle, on remplace simplement le masque existant
           const newMaskUrl = `data:image/png;base64,${data.masks[0]}`
-          currentObject.masks[frameTime] = newMaskUrl
+          
+          // Vérifier si un masque existe déjà pour ce frame
+          if (currentObject.masks[frameTime]) {
+            // Créer un canvas pour combiner les masques
+            const combineCanvas = document.createElement('canvas')
+            const combineCtx = combineCanvas.getContext('2d')
+            
+            // Configurer le canvas
+            combineCanvas.width = video.videoWidth
+            combineCanvas.height = video.videoHeight
+            
+            // Charger l'ancien masque
+            const oldMask = new Image()
+            oldMask.src = currentObject.masks[frameTime]
+            
+            // Charger le nouveau masque
+            const newMask = new Image()
+            newMask.src = newMaskUrl
+            
+            // Attendre que les deux images soient chargées
+            await Promise.all([
+              new Promise(resolve => { oldMask.onload = resolve }),
+              new Promise(resolve => { newMask.onload = resolve })
+            ])
+            
+            // Dessiner l'ancien masque
+            combineCtx.drawImage(oldMask, 0, 0)
+            
+            // Combiner avec le nouveau masque
+            combineCtx.globalCompositeOperation = 'lighter'
+            combineCtx.drawImage(newMask, 0, 0)
+            
+            // Convertir le canvas combiné en URL data
+            currentObject.masks[frameTime] = combineCanvas.toDataURL('image/png')
+            
+            console.log('Rectangle mask combined for frame:', frameTime)
+          } else {
+            // S'il n'y a pas de masque précédent, utiliser le nouveau directement
+            currentObject.masks[frameTime] = newMaskUrl
+            console.log('New rectangle mask set for frame:', frameTime)
+          }
           
           // Ajouter un point dans la timeline pour marquer la segmentation
           if (!currentObject.points[frameTime]) {
@@ -570,11 +610,12 @@ export default {
           // On ajoute un point "virtuel" pour la timeline
           currentObject.points[frameTime].push({ isTimelineMarker: true })
           
-          console.log('Rectangle mask set for frame:', frameTime)
+          // Forcer la mise à jour de l'interface
+          this.$forceUpdate()
         }
 
       } catch (error) {
-        console.error('Erreur lors de la segmentation:', error)
+        console.error('Erreur lors de la segmentation par rectangle:', error)
       }
     },
 
