@@ -34,3 +34,4 @@ export default {
 
 
 <!-- npm run electron:serve -->
+<!-- uvicorn main:app --reload -->
