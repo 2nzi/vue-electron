@@ -5,7 +5,7 @@ import SegmentationView from '../views/SegmentationView.vue'
 const routes = [
   {
     path: '/',
-    redirect: '/calibration'
+    redirect: '/segmentation'
   },
   {
     path: '/calibration',

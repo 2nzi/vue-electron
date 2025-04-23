@@ -1,18 +1,12 @@
 <template>
   <div id="app">
-    <navigation-switch />
     <router-view />
   </div>
 </template>
 
 <script>
-import NavigationSwitch from '@/components/shared/NavigationSwitch.vue'
-
 export default {
-  name: 'App',
-  components: {
-    NavigationSwitch
-  }
+  name: 'App'
 }
 </script>
 
