@@ -202,10 +202,12 @@ export default {
     
     this.updateDimensions()
     window.addEventListener('resize', this.updateDimensions)
+    window.addEventListener('keydown', this.handleKeyDown)
   },
 
   beforeUnmount() {
     window.removeEventListener('resize', this.updateDimensions)
+    window.removeEventListener('keydown', this.handleKeyDown)
   },
 
   methods: {
@@ -419,7 +421,19 @@ export default {
       })
 
       console.log('Point ajouté:', { x: imageX, y: imageY, type: type })
-    }
+    },
+
+    handleKeyDown(e) {
+      if (e.key === 'Delete' && this.selectedId) {
+        // Supprimer l'élément des rectangles s'il y est
+        this.rectangles = this.rectangles.filter(rect => rect.id !== this.selectedId)
+        // Supprimer l'élément des points s'il y est
+        this.points = this.points.filter(point => point.id !== this.selectedId)
+        // Réinitialiser la sélection
+        this.selectedId = null
+        console.log('Element deleted:', this.selectedId)
+      }
+    },
   }
 }
 </script>
