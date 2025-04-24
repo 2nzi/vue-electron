@@ -43,6 +43,8 @@ async function createWindow() {
     }
   })
 
+  win.setMenu(null)
+
   remote.enable(win.webContents)
 
   // Allow loading local files
