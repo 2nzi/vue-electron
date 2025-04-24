@@ -239,11 +239,12 @@ export default {
     this.imageElement = new Image()
     this.imageElement.src = require('@/assets/imgFoot.jpg')
     this.imageElement.onload = () => {
-      this.updateDimensions()
-      this.centerImage()
+      this.$nextTick(() => {
+        this.updateDimensions()
+        this.centerImage()
+      })
     }
     
-    this.updateDimensions()
     window.addEventListener('resize', this.updateDimensions)
     window.addEventListener('keydown', this.handleKeyDown)
   },
@@ -262,27 +263,30 @@ export default {
   methods: {
     updateDimensions() {
       const container = this.$refs.container
-      if (!container) return
+      if (!container || !this.imageElement) return
 
       // Obtenir les dimensions du conteneur
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
-      // Calculer les dimensions en respectant le ratio 16:9 et la hauteur max
+      // Calculer le ratio de l'image
+      const imageRatio = this.imageElement.naturalWidth / this.imageElement.naturalHeight
+
+      // Calculer les dimensions en conservant le ratio de l'image originale
       let width = containerWidth
-      let height = width * 9/16
+      let height = width / imageRatio
 
       // Si la hauteur calculée dépasse la hauteur du conteneur, on ajuste
       if (height > containerHeight) {
         height = containerHeight
-        width = height * 16/9
+        width = height * imageRatio
       }
 
       // Mettre à jour les dimensions
       this.imageWidth = width
       this.imageHeight = height
-      this.stageConfig.width = width
-      this.stageConfig.height = height
+      this.stageConfig.width = containerWidth
+      this.stageConfig.height = containerHeight
 
       // Centrer l'image
       this.position.x = (containerWidth - width) / 2
@@ -614,8 +618,6 @@ export default {
 .video-tools {
   width: 50px;
   height: 100%;
-  /* background: #2a2a2a; */
-  border-radius: 4px;
   padding: 8px;
   display: flex;
   flex-direction: column;
@@ -627,8 +629,6 @@ export default {
 .video-container {
   flex: 1;
   position: relative;
-  /* background: #2a2a2a; */
-  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -637,8 +637,10 @@ export default {
 
 .video-container > * {
   position: absolute;
+  top: 0;
   left: 0;
-  height: auto;
+  width: 100%;
+  height: 100%;
 }
 
 .tool-btn {
@@ -673,7 +675,6 @@ export default {
 .validation-tools {
   width: 50px;
   height: 100%;
-  border-radius: 4px;
   padding: 8px;
   display: flex;
   flex-direction: column;

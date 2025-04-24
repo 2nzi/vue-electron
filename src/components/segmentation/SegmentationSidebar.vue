@@ -28,8 +28,14 @@ export default {
   data() {
     return {
       videos: [],
-      selectedVideo: null
+      selectedVideo: null,
+      defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw'
     }
+  },
+
+  mounted() {
+    // Charger le dossier par défaut au démarrage
+    this.loadVideosFromFolder(this.defaultPath)
   },
 
   methods: {

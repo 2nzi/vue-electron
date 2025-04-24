@@ -43,7 +43,7 @@ async function createWindow() {
     }
   })
 
-  win.setMenu(null)
+  // win.setMenu(null)
 
   remote.enable(win.webContents)
 
