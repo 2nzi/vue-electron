@@ -179,6 +179,31 @@
         </v-layer>
       </v-stage>
     </div>
+
+    <div class="validation-tools">
+      <button 
+        v-show="isPointingMode"
+        class="tool-btn"
+        @click="validatePoints"
+        title="Validate Points"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </button>
+      
+      <button 
+        v-show="isPointingMode"
+        class="tool-btn"
+        @click="cancelPoints"
+        title="Cancel Points"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
   </div>
 </template>
 
@@ -226,6 +251,12 @@ export default {
   beforeUnmount() {
     window.removeEventListener('resize', this.updateDimensions)
     window.removeEventListener('keydown', this.handleKeyDown)
+  },
+
+  computed: {
+    isPointingMode() {
+      return this.currentTool === 'positive' || this.currentTool === 'negative'
+    }
   },
 
   methods: {
@@ -556,6 +587,18 @@ export default {
           break
       }
     },
+
+    validatePoints() {
+      // Émettre un événement avec les points actuels
+      this.$emit('points-validated', this.points)
+      this.points = [] // Réinitialiser les points après validation
+      this.currentTool = 'arrow' // Revenir à l'outil de sélection
+    },
+
+    cancelPoints() {
+      this.points = [] // Supprimer tous les points
+      this.currentTool = 'arrow' // Revenir à l'outil de sélection
+    }
   }
 }
 </script>
@@ -625,5 +668,27 @@ export default {
   width: 20px;
   height: 20px;
   stroke-width: 2;
+}
+
+.validation-tools {
+  width: 50px;
+  height: 100%;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+}
+
+.tool-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: transparent;
+}
+
+.tool-btn:not(:disabled):hover {
+  background: #4a4a4a;
 }
 </style> 
