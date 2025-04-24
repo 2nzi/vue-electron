@@ -187,6 +187,8 @@ export default {
       rectangles: [],
       mousePosition: { x: null, y: null },
       selectedId: null,
+      isDragging: false,
+      dragStartPos: { x: 0, y: 0 },
     }
   },
 
@@ -270,6 +272,8 @@ export default {
         
         if (clickedRect) {
           this.selectedId = clickedRect.id
+          this.isDragging = true
+          this.dragStartPos = pointerPos
           console.log('Selected rectangle:', this.selectedId)
           return
         }
@@ -283,11 +287,14 @@ export default {
 
         if (clickedPoint) {
           this.selectedId = clickedPoint.id
+          this.isDragging = true
+          this.dragStartPos = pointerPos
           console.log('Selected point:', this.selectedId)
           return
         }
 
         this.selectedId = null
+        this.isDragging = false
       }
 
       switch(this.currentTool) {
@@ -314,6 +321,27 @@ export default {
       const pointerPos = stage.getPointerPosition()
       this.mousePosition = pointerPos
 
+      if (this.isDragging && this.selectedId && this.currentTool === 'arrow') {
+        const dx = pointerPos.x - this.dragStartPos.x
+        const dy = pointerPos.y - this.dragStartPos.y
+
+        // Mettre à jour la position du rectangle ou du point sélectionné
+        const selectedRect = this.rectangles.find(r => r.id === this.selectedId)
+        if (selectedRect) {
+          selectedRect.x += dx
+          selectedRect.y += dy
+        }
+
+        const selectedPoint = this.points.find(p => p.id === this.selectedId)
+        if (selectedPoint) {
+          selectedPoint.x += dx
+          selectedPoint.y += dy
+        }
+
+        this.dragStartPos = pointerPos
+        return
+      }
+
       if (!this.isDrawing || this.currentTool !== 'rectangle') return
 
       // Calculer la taille du rectangle en utilisant les coordonnées absolues
@@ -324,6 +352,11 @@ export default {
     },
 
     handleMouseUp() {
+      if (this.isDragging) {
+        this.isDragging = false
+        return
+      }
+
       if (!this.isDrawing || this.currentTool !== 'rectangle') return
 
       // Convertir en coordonnées relatives à l'image
