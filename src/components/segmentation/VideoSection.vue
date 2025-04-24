@@ -1,6 +1,18 @@
 <template>
   <div class="video-section">
     <div class="video-tools">
+
+      <button 
+        class="tool-btn"
+        :class="{ active: currentTool === 'arrow' }"
+        @click="selectTool('arrow')"
+        title="Selection Tool"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M3 3l7 19 2.051-7.179L19 13 3 3z"/>
+        </svg>
+      </button>
+      
       <button 
         class="tool-btn"
         :class="{ active: currentTool === 'rectangle' }"
@@ -36,6 +48,8 @@
           <line x1="7" y1="12" x2="17" y2="12" stroke="white" stroke-width="2"/>
         </svg>
       </button>
+
+
     </div>
     <div class="video-container" ref="container">
       <v-stage
@@ -166,12 +180,13 @@ export default {
         width: 0,
         height: 0
       },
-      currentTool: 'rectangle',
+      currentTool: 'arrow',
       isDrawing: false,
       rectangleStart: { x: 0, y: 0 },
       rectangleSize: { width: 0, height: 0 },
       rectangles: [],
       mousePosition: { x: null, y: null },
+      selectedId: null,
     }
   },
 
@@ -243,6 +258,37 @@ export default {
 
       // Vérifier si le clic est dans les limites de l'image
       if (!this.isInsideImage(pointerPos)) return
+
+      if (this.currentTool === 'arrow') {
+        // Vérifier si on clique sur un rectangle
+        const clickedRect = this.rectangles.find(rect => 
+          pointerPos.x >= rect.x && 
+          pointerPos.x <= rect.x + rect.width &&
+          pointerPos.y >= rect.y && 
+          pointerPos.y <= rect.y + rect.height
+        )
+        
+        if (clickedRect) {
+          this.selectedId = clickedRect.id
+          console.log('Selected rectangle:', this.selectedId)
+          return
+        }
+
+        // Vérifier si on clique sur un point (avec une marge de 5 pixels)
+        const clickedPoint = this.points.find(point => {
+          const dx = point.x - pointerPos.x
+          const dy = point.y - pointerPos.y
+          return Math.sqrt(dx * dx + dy * dy) <= 5
+        })
+
+        if (clickedPoint) {
+          this.selectedId = clickedPoint.id
+          console.log('Selected point:', this.selectedId)
+          return
+        }
+
+        this.selectedId = null
+      }
 
       switch(this.currentTool) {
         case 'rectangle':
