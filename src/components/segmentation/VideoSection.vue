@@ -126,6 +126,23 @@
               fill: 'rgba(76, 175, 80, 0.2)'
             }"
           />
+          <!-- Poignées de redimensionnement pour le rectangle sélectionné -->
+          <template v-if="selectedId && currentTool === 'arrow'">
+            <v-circle
+              v-for="handle in getResizeHandles()"
+              :key="handle.position"
+              :config="{
+                x: handle.x,
+                y: handle.y,
+                radius: 4,
+                fill: 'white',
+                stroke: '#4CAF50',
+                strokeWidth: 1,
+                draggable: true
+              }"
+              @dragmove="handleResize($event, handle.position)"
+            />
+          </template>
           <!-- Points existants -->
           <v-group
             v-for="point in points"
@@ -189,6 +206,7 @@ export default {
       selectedId: null,
       isDragging: false,
       dragStartPos: { x: 0, y: 0 },
+      resizing: false,
     }
   },
 
@@ -260,8 +278,22 @@ export default {
       const stage = this.$refs.stage.getStage()
       const pointerPos = stage.getPointerPosition()
 
-      // Vérifier si le clic est dans les limites de l'image
       if (!this.isInsideImage(pointerPos)) return
+
+      // Vérifier si on clique sur une poignée de redimensionnement
+      if (this.currentTool === 'arrow' && this.selectedId) {
+        const handles = this.getResizeHandles()
+        const clickedHandle = handles.find(handle => {
+          const dx = handle.x - pointerPos.x
+          const dy = handle.y - pointerPos.y
+          return Math.sqrt(dx * dx + dy * dy) <= 5
+        })
+        
+        if (clickedHandle) {
+          this.resizing = true
+          return
+        }
+      }
 
       if (this.currentTool === 'arrow') {
         // Vérifier si on clique sur un rectangle
@@ -354,6 +386,11 @@ export default {
     },
 
     handleMouseUp() {
+      if (this.resizing) {
+        this.resizing = false
+        return
+      }
+
       if (this.isDragging) {
         this.isDragging = false
         return
@@ -432,6 +469,91 @@ export default {
         // Réinitialiser la sélection
         this.selectedId = null
         console.log('Element deleted:', this.selectedId)
+      }
+    },
+
+    getResizeHandles() {
+      const rect = this.rectangles.find(r => r.id === this.selectedId)
+      if (!rect) return []
+
+      return [
+        // Coins
+        { position: 'nw', x: rect.x, y: rect.y },                           // Nord-Ouest
+        { position: 'ne', x: rect.x + rect.width, y: rect.y },             // Nord-Est
+        { position: 'se', x: rect.x + rect.width, y: rect.y + rect.height }, // Sud-Est
+        { position: 'sw', x: rect.x, y: rect.y + rect.height },            // Sud-Ouest
+        
+        // Côtés
+        { position: 'n', x: rect.x + rect.width/2, y: rect.y },              // Nord
+        { position: 'e', x: rect.x + rect.width, y: rect.y + rect.height/2 }, // Est
+        { position: 's', x: rect.x + rect.width/2, y: rect.y + rect.height }, // Sud
+        { position: 'w', x: rect.x, y: rect.y + rect.height/2 }              // Ouest
+      ]
+    },
+
+    handleResize(e, position) {
+      const rect = this.rectangles.find(r => r.id === this.selectedId)
+      if (!rect) return
+
+      const stage = this.$refs.stage.getStage()
+      const pos = stage.getPointerPosition()
+
+      // Garder les valeurs originales pour les calculs
+      const originalX = rect.x
+      const originalY = rect.y
+      const originalWidth = rect.width
+      const originalHeight = rect.height
+      let newWidth, newHeight
+
+      switch (position) {
+        case 'e': // Est
+          rect.width = Math.max(10, pos.x - rect.x)
+          break
+        case 'w': // Ouest
+          newWidth = originalWidth + (originalX - pos.x)
+          if (newWidth >= 10) {
+            rect.x = pos.x
+            rect.width = newWidth
+          }
+          break
+        case 'n': // Nord
+          newHeight = originalHeight + (originalY - pos.y)
+          if (newHeight >= 10) {
+            rect.y = pos.y
+            rect.height = newHeight
+          }
+          break
+        case 's': // Sud
+          rect.height = Math.max(10, pos.y - rect.y)
+          break
+        case 'nw': // Nord-Ouest
+          if (originalWidth + (originalX - pos.x) >= 10) {
+            rect.x = pos.x
+            rect.width = originalWidth + (originalX - pos.x)
+          }
+          if (originalHeight + (originalY - pos.y) >= 10) {
+            rect.y = pos.y
+            rect.height = originalHeight + (originalY - pos.y)
+          }
+          break
+        case 'ne': // Nord-Est
+          rect.width = Math.max(10, pos.x - rect.x)
+          if (originalHeight + (originalY - pos.y) >= 10) {
+            rect.y = pos.y
+            rect.height = originalHeight + (originalY - pos.y)
+          }
+          break
+        case 'se': // Sud-Est
+          rect.width = Math.max(10, pos.x - rect.x)
+          rect.height = Math.max(10, pos.y - rect.y)
+          break
+        case 'sw': // Sud-Ouest
+          if (originalWidth + (originalX - pos.x) >= 10) {
+            rect.x = pos.x
+            rect.width = originalWidth + (originalX - pos.x)
+          }
+          rect.height = Math.max(10, pos.y - rect.y)
+          break
       }
     },
   }
