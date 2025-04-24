@@ -232,25 +232,25 @@ export default {
       isDragging: false,
       dragStartPos: { x: 0, y: 0 },
       resizing: false,
+      resizeTimeout: null,
     }
   },
 
   mounted() {
     this.imageElement = new Image()
     this.imageElement.src = require('@/assets/imgFoot.jpg')
+    
+    // Attendre que l'image soit chargée
     this.imageElement.onload = () => {
-      this.$nextTick(() => {
-        this.updateDimensions()
-        this.centerImage()
-      })
+      this.initializeView()
     }
     
-    window.addEventListener('resize', this.updateDimensions)
+    window.addEventListener('resize', this.handleWindowResize)
     window.addEventListener('keydown', this.handleKeyDown)
   },
 
   beforeUnmount() {
-    window.removeEventListener('resize', this.updateDimensions)
+    window.removeEventListener('resize', this.handleWindowResize)
     window.removeEventListener('keydown', this.handleKeyDown)
   },
 
@@ -261,45 +261,50 @@ export default {
   },
 
   methods: {
+    initializeView() {
+      this.$nextTick(() => {
+        this.updateDimensions()
+      })
+    },
+
+    handleWindowResize() {
+      if (this.resizeTimeout) {
+        clearTimeout(this.resizeTimeout)
+      }
+      this.resizeTimeout = setTimeout(() => {
+        this.updateDimensions()
+      }, 100)
+    },
+
     updateDimensions() {
       const container = this.$refs.container
       if (!container || !this.imageElement) return
 
-      // Obtenir les dimensions du conteneur
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
       // Calculer le ratio de l'image
       const imageRatio = this.imageElement.naturalWidth / this.imageElement.naturalHeight
 
-      // Calculer les dimensions en conservant le ratio de l'image originale
+      // Calculer les dimensions en conservant le ratio
       let width = containerWidth
       let height = width / imageRatio
 
-      // Si la hauteur calculée dépasse la hauteur du conteneur, on ajuste
       if (height > containerHeight) {
         height = containerHeight
         width = height * imageRatio
       }
 
       // Mettre à jour les dimensions
-      this.imageWidth = width
-      this.imageHeight = height
       this.stageConfig.width = containerWidth
       this.stageConfig.height = containerHeight
+      this.imageWidth = width
+      this.imageHeight = height
 
       // Centrer l'image
-      this.position.x = (containerWidth - width) / 2
-      this.position.y = (containerHeight - height) / 2
-    },
-
-    centerImage() {
-      const stage = this.$refs.stage?.getStage()
-      if (!stage) return
-
       this.position = {
-        x: 0,
-        y: 0
+        x: Math.floor((containerWidth - width) / 2),
+        y: Math.floor((containerHeight - height) / 2)
       }
     },
 
@@ -481,13 +486,18 @@ export default {
       const scaleX = imageOriginalWidth / this.imageWidth
       const scaleY = imageOriginalHeight / this.imageHeight
 
-      const imageX = Math.round(pos.x * scaleX)
-      const imageY = Math.round(pos.y * scaleY)
+      // Coordonnées relatives à l'image
+      const relativeX = pos.x - this.position.x
+      const relativeY = pos.y - this.position.y
+
+      // Coordonnées dans l'image originale
+      const imageX = Math.round(relativeX * scaleX)
+      const imageY = Math.round(relativeY * scaleY)
 
       this.points.push({
         id: Date.now(),
-        x: pos.x + this.position.x, // Ajuster la position pour le rendu
-        y: pos.y + this.position.y,
+        x: pos.x, // Utiliser directement les coordonnées du clic
+        y: pos.y,
         type: type,
         color: type === 'positive' ? '#4CAF50' : '#f44336'
       })
@@ -603,7 +613,21 @@ export default {
       this.points = [] // Supprimer tous les points
       this.currentTool = 'arrow' // Revenir à l'outil de sélection
     }
-  }
+  },
+
+  watch: {
+    // Surveiller les changements de dimensions du conteneur
+    'stageConfig.width'() {
+      this.$nextTick(() => {
+        this.updateDimensions()
+      })
+    },
+    'stageConfig.height'() {
+      this.$nextTick(() => {
+        this.updateDimensions()
+      })
+    }
+  },
 }
 </script>
 
