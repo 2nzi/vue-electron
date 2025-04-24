@@ -117,13 +117,14 @@ export default {
   padding: 8px;
   background: #3A3A3A;
   transition: margin-left 0.3s ease;
+  height: 100%;
+  max-height: 100vh;
 }
 
 .main-content-expanded {
-  margin-left: 20px; /* Pour compenser le bouton */
+  margin-left: 20px;
 }
 
-/* Modifier la position du bouton quand la sidebar est repliée */
 .sidebar-collapsed ~ .toggle-sidebar {
   left: 0;
 }
@@ -131,6 +132,9 @@ export default {
 .video-section, .zoom-video, .timeline, .warning {
   background: #2a2a2a;
   border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .video-section {
@@ -149,6 +153,7 @@ export default {
   grid-column: 1;
   grid-row: 2;
   background: #1a1a1a;
+  max-height: 100%;
 }
 
 .warning {
