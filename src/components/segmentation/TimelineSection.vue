@@ -60,7 +60,8 @@ export default {
       videoElement: null,
       thumbnails: [],
       thumbnailCount: 6,
-      timeUpdateInterval: null
+      timeUpdateInterval: null,
+      keyboardListener: null
     }
   },
   
@@ -68,6 +69,18 @@ export default {
     progressPercentage() {
       return (this.currentTime / this.duration) * 100 || 0
     }
+  },
+  
+  mounted() {
+    // Ajouter un écouteur d'événement pour les touches Entrée et Espace
+    this.keyboardListener = (event) => {
+      if (event.key === ' ' || event.code === 'Space') {
+        // Empêcher le comportement par défaut (comme le défilement de la page avec la barre d'espace)
+        event.preventDefault();
+        this.togglePlayPause();
+      }
+    };
+    document.addEventListener('keydown', this.keyboardListener);
   },
   
   watch: {
@@ -218,6 +231,11 @@ export default {
       this.videoElement.pause()
       this.videoElement.src = ''
       this.videoElement = null
+    }
+    
+    // Supprimer l'écouteur d'événement lors du démontage du composant
+    if (this.keyboardListener) {
+      document.removeEventListener('keydown', this.keyboardListener);
     }
   }
 }
