@@ -60,7 +60,7 @@ export default {
 .segmentation-view {
   display: flex;
   height: 100vh;
-  background: #1a1a1a;
+  /* background: #1a1a1a; */
   position: relative;
 }
 
@@ -115,7 +115,7 @@ export default {
   grid-template-rows: 1fr 1fr;
   gap: 24px;
   padding: 8px;
-  background: #3A3A3A;
+  background: #2A2A2A;
   transition: margin-left 0.3s ease;
 }
 
@@ -136,19 +136,19 @@ export default {
 .video-section {
   grid-column: 1;
   grid-row: 1;
-  background: #1a1a1a;
+  /* background: #1a1a1a; */
 }
 
 .zoom-video {
   grid-column: 2;
   grid-row: 1;
-  background: #1a1a1a;
+  /* background: #1a1a1a; */
 }
 
 .timeline {
   grid-column: 1;
   grid-row: 2;
-  background: #1a1a1a;
+  /* background: #1a1a1a; */
   display: flex; /* Ajout pour permettre à l'enfant de prendre toute la hauteur */
   flex-direction: column; /* Organisation verticale */
   max-height: 100%; /* Limite la hauteur à la cellule de la grille */
@@ -158,6 +158,6 @@ export default {
 .warning {
   grid-column: 2;
   grid-row: 2;
-  background: #1a1a1a;
+  /* background: #1a1a1a; */
 }
 </style>

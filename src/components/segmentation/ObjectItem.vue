@@ -34,7 +34,7 @@ export default {
 }
 
 .object-id {
-  width: 50px;
+  width: 35px;
   font-weight: bold;
   font-size: 0.9rem;
   overflow: hidden;

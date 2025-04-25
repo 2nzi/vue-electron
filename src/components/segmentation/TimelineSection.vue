@@ -255,8 +255,7 @@ export default {
 
 <style scoped>
 .timeline-section {
-  background: #000000;
-  padding-top: 35px;
+  padding-top: 25px;
   width: 100%;
 }
 

@@ -30,7 +30,13 @@ export default {
       objects: [
         { id: 'Id1' },
         { id: 'Id2' },
-        { id: 'Id3' }
+        { id: 'Id3' },
+        { id: 'Id4' },
+        { id: 'Id5' },
+        { id: 'Id6' },
+        { id: 'Id7' },
+        { id: 'Id8' },
+        { id: 'Id9' },
       ]
     }
   }
@@ -60,7 +66,7 @@ export default {
   flex-grow: 1;
   overflow-y: auto; /* Activer le défilement vertical */
   padding: 8px;
-  background: #1a1a1a;
+  background: #2a2a2a;
   border-radius: 4px;
   /* Stylisation de la scrollbar */
   scrollbar-width: thin;

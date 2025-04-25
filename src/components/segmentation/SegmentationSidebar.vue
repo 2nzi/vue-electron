@@ -34,14 +34,14 @@ export default {
     }
   },
 
-  // watch: {
-  //   'videoStore.selectedVideo': {
-  //     handler(newVideo) {
-  //       console.log('Vidéo sélectionnée:', newVideo)
-  //     },
-  //     deep: true
-  //   }
-  // },
+  watch: {
+    'videoStore.selectedVideo': {
+      handler(newVideo) {
+        console.log('Vidéo sélectionnée:', newVideo)
+      },
+      deep: true
+    }
+  },
 
   mounted() {
     // Charger le dossier par défaut au démarrage
@@ -62,7 +62,7 @@ export default {
     },
 
     selectVideo(video) {
-      this.videoStore.selectVideo(video)
+      this.videoStore.setSelectedVideo(video)
       this.$emit('video-selected', video)
     }
   }
