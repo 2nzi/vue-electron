@@ -2,7 +2,15 @@
   <div class="objects-timeline-section">
     <div class="timeline-container">
       <div class="objects-container">
-        <object-item v-for="object in objects" :key="object.id" :object-id="object.id" />
+        <object-item 
+          v-for="(object, index) in objects" 
+          :key="object.id" 
+          :object-id="object.id"
+          :color-index="index"
+        />
+        <div class="add-object">
+          <button class="add-button">+</button>
+        </div>
       </div>
       <div class="timeline-tools"></div>
     </div>
@@ -22,13 +30,7 @@ export default {
       objects: [
         { id: 'Id1' },
         { id: 'Id2' },
-        { id: 'Id3' },
-        { id: 'Id4' },
-        { id: 'Id5' },
-        { id: 'Id6' },
-        { id: 'Id7' },
-        { id: 'Id8' }
-        
+        { id: 'Id3' }
       ]
     }
   }
@@ -57,10 +59,17 @@ export default {
 .objects-container {
   flex-grow: 1;
   overflow-y: auto; /* Activer le défilement vertical */
-  padding-right: 8px;
+  padding: 8px;
+  background: #1a1a1a;
+  border-radius: 4px;
   /* Stylisation de la scrollbar */
   scrollbar-width: thin;
   scrollbar-color: #555 #2c2c2c;
+  direction: rtl; /* Déplace la scrollbar à gauche */
+}
+
+.objects-container > * {
+  direction: ltr; /* Rétablit la direction normale pour le contenu */
 }
 
 /* Stylisation de la scrollbar pour Chrome/Safari/Edge */
@@ -90,5 +99,30 @@ h3 {
   margin: 0 0 12px 0;
   font-size: 1rem;
   font-weight: 500;
+}
+
+.add-object {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.add-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #2c2c2c;
+  border: none;
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.add-button:hover {
+  background: #3c3c3c;
 }
 </style> 
