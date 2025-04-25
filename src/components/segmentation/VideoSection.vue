@@ -208,12 +208,16 @@
 </template>
 
 <script>
+import { useVideoStore } from '@/stores/videoStore'
+
 export default {
   name: 'VideoSection',
 
   data() {
     return {
       imageElement: null,
+      videoElement: null,
+      currentFrame: null,
       imageWidth: 0,
       imageHeight: 0,
       position: { x: 0, y: 0 },
@@ -237,13 +241,18 @@ export default {
   },
 
   mounted() {
+    // Initialiser l'élément image sans source par défaut
     this.imageElement = new Image()
-    this.imageElement.src = require('@/assets/imgFoot.jpg')
     
-    // Attendre que l'image soit chargée
-    this.imageElement.onload = () => {
-      this.initializeView()
-    }
+    // Créer l'élément vidéo
+    this.videoElement = document.createElement('video')
+    this.videoElement.crossOrigin = 'anonymous'
+    
+    // Écouter les événements de la vidéo
+    this.videoElement.addEventListener('loadedmetadata', this.handleVideoLoaded)
+    
+    // S'abonner aux changements de vidéo dans le store
+    this.subscribeToVideoStore()
     
     window.addEventListener('resize', this.handleWindowResize)
     window.addEventListener('keydown', this.handleKeyDown)
@@ -252,6 +261,10 @@ export default {
   beforeUnmount() {
     window.removeEventListener('resize', this.handleWindowResize)
     window.removeEventListener('keydown', this.handleKeyDown)
+    
+    if (this.videoElement) {
+      this.videoElement.removeEventListener('loadedmetadata', this.handleVideoLoaded)
+    }
   },
 
   computed: {
@@ -261,6 +274,120 @@ export default {
   },
 
   methods: {
+    subscribeToVideoStore() {
+      // Utiliser le store vidéo pour obtenir la vidéo sélectionnée
+      const videoStore = useVideoStore()
+      
+      // Observer les changements dans le store
+      this.$watch(
+        () => videoStore.selectedVideo,
+        (newVideo) => {
+          if (newVideo) {
+            console.log('Nouvelle vidéo sélectionnée dans VideoSection:', newVideo)
+            this.loadVideo(newVideo.path)
+          }
+        },
+        { immediate: true }
+      )
+      
+      // Observer les changements de temps dans la timeline
+      this.$watch(
+        () => videoStore.currentTime,
+        (newTime) => {
+          if (this.videoElement && newTime !== undefined) {
+            console.log('Mise à jour du temps dans VideoSection:', newTime)
+            this.updateCurrentFrame(newTime)
+          }
+        }
+      )
+      
+      // Observer l'état de lecture (play/pause)
+      this.$watch(
+        () => videoStore.isPlaying,
+        (isPlaying) => {
+          console.log('État de lecture changé dans VideoSection:', isPlaying)
+          if (isPlaying) {
+            // Pas besoin de jouer la vidéo ici, nous capturons juste les frames
+          } else {
+            // Assurez-vous que la vidéo est bien à la position actuelle
+            if (this.videoElement && videoStore.currentTime !== undefined) {
+              this.updateCurrentFrame(videoStore.currentTime)
+            }
+          }
+        }
+      )
+    },
+    
+    loadVideo(videoPath) {
+      if (!videoPath) return
+      
+      this.videoElement.src = videoPath
+      this.videoElement.load()
+    },
+    
+    handleVideoLoaded() {
+      console.log('Vidéo chargée, dimensions:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight)
+      
+      this.frameCanvas = document.createElement('canvas')
+      this.frameContext = this.frameCanvas.getContext('2d')
+      
+      this.frameCanvas.width = this.videoElement.videoWidth
+      this.frameCanvas.height = this.videoElement.videoHeight
+      
+      this.captureVideoFrame(0)
+      
+      this.initializeView()
+    },
+    
+    updateCurrentFrame(time) {
+      if (!this.videoElement || !this.frameContext) return
+      
+      console.log('Capture de frame à:', time)
+      // Positionner la vidéo au temps spécifié
+      this.videoElement.currentTime = time
+      
+      // Capturer la frame à ce moment
+      this.captureVideoFrame(time)
+    },
+    
+    async captureVideoFrame(time) {
+      if (!this.videoElement || !this.frameContext) return
+      
+      // Positionner la vidéo au temps spécifié
+      this.videoElement.currentTime = time
+      
+      // Attendre que la vidéo soit positionnée
+      await new Promise(resolve => {
+        const seekHandler = () => {
+          // Dessiner la frame sur le canvas
+          this.frameContext.drawImage(
+            this.videoElement, 
+            0, 0, 
+            this.videoElement.videoWidth, 
+            this.videoElement.videoHeight
+          )
+          
+          // Convertir le canvas en image
+          const frameUrl = this.frameCanvas.toDataURL('image/jpeg')
+          
+          // Créer une nouvelle image avec cette frame
+          const frameImage = new Image()
+          frameImage.onload = () => {
+            this.currentFrame = frameImage
+            this.imageElement = frameImage // Remplacer l'image par la frame actuelle
+            this.updateDimensions()
+            resolve()
+          }
+          frameImage.src = frameUrl
+          
+          // Supprimer l'écouteur après utilisation
+          this.videoElement.removeEventListener('seeked', seekHandler)
+        }
+        
+        this.videoElement.addEventListener('seeked', seekHandler, { once: true })
+      })
+    },
+
     initializeView() {
       this.$nextTick(() => {
         this.updateDimensions()
@@ -283,10 +410,10 @@ export default {
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
-      // Calculer le ratio de l'image
-      const imageRatio = this.imageElement.naturalWidth / this.imageElement.naturalHeight
+      const img = this.currentFrame || this.imageElement
+      
+      const imageRatio = img.naturalWidth / img.naturalHeight
 
-      // Calculer les dimensions en conservant le ratio
       let width = containerWidth
       let height = width / imageRatio
 
@@ -295,13 +422,11 @@ export default {
         width = height * imageRatio
       }
 
-      // Mettre à jour les dimensions
       this.stageConfig.width = containerWidth
       this.stageConfig.height = containerHeight
       this.imageWidth = width
       this.imageHeight = height
 
-      // Centrer l'image
       this.position = {
         x: Math.floor((containerWidth - width) / 2),
         y: Math.floor((containerHeight - height) / 2)
@@ -320,7 +445,6 @@ export default {
 
       if (!this.isInsideImage(pointerPos)) return
 
-      // Vérifier si on clique sur une poignée de redimensionnement
       if (this.currentTool === 'arrow' && this.selectedId) {
         const handles = this.getResizeHandles()
         const clickedHandle = handles.find(handle => {
@@ -336,7 +460,6 @@ export default {
       }
 
       if (this.currentTool === 'arrow') {
-        // Vérifier si on clique sur un rectangle
         const clickedRect = this.rectangles.find(rect => 
           pointerPos.x >= rect.x && 
           pointerPos.x <= rect.x + rect.width &&
@@ -352,7 +475,6 @@ export default {
           return
         }
 
-        // Vérifier si on clique sur un point (avec une marge de 5 pixels)
         const clickedPoint = this.points.find(point => {
           const dx = point.x - pointerPos.x
           const dy = point.y - pointerPos.y
@@ -374,7 +496,6 @@ export default {
       switch(this.currentTool) {
         case 'rectangle':
           this.isDrawing = true
-          // Stocker directement les coordonnées absolues
           this.rectangleStart = {
             x: pointerPos.x,
             y: pointerPos.y
@@ -399,7 +520,6 @@ export default {
         const dx = pointerPos.x - this.dragStartPos.x
         const dy = pointerPos.y - this.dragStartPos.y
 
-        // Mettre à jour la position du rectangle ou du point sélectionné
         const selectedRect = this.rectangles.find(r => r.id === this.selectedId)
         if (selectedRect) {
           selectedRect.x += dx
@@ -418,7 +538,6 @@ export default {
 
       if (!this.isDrawing || this.currentTool !== 'rectangle') return
 
-      // Calculer la taille du rectangle en utilisant les coordonnées absolues
       this.rectangleSize = {
         width: pointerPos.x - this.rectangleStart.x,
         height: pointerPos.y - this.rectangleStart.y
@@ -438,13 +557,11 @@ export default {
 
       if (!this.isDrawing || this.currentTool !== 'rectangle') return
 
-      // Convertir en coordonnées relatives à l'image
       const relativeStart = {
         x: this.rectangleStart.x - this.position.x,
         y: this.rectangleStart.y - this.position.y
       }
 
-      // Convertir en coordonnées de l'image originale
       const imageOriginalWidth = this.imageElement.naturalWidth
       const imageOriginalHeight = this.imageElement.naturalHeight
       const scaleX = imageOriginalWidth / this.imageWidth
@@ -457,7 +574,6 @@ export default {
         height: Math.round(this.rectangleSize.height * scaleY)
       }
 
-      // Sauvegarder le rectangle avec les coordonnées absolues pour l'affichage
       this.rectangles.push({
         id: Date.now(),
         x: this.rectangleStart.x,
@@ -472,7 +588,6 @@ export default {
       this.rectangleSize = { width: 0, height: 0 }
     },
 
-    // Nouvelle méthode pour vérifier si un point est dans l'image
     isInsideImage(point) {
       return point.x >= this.position.x && 
              point.x <= this.position.x + this.imageWidth &&
@@ -481,22 +596,21 @@ export default {
     },
 
     addPoint(pos, type) {
-      const imageOriginalWidth = this.imageElement.naturalWidth
-      const imageOriginalHeight = this.imageElement.naturalHeight
+      const sourceElement = this.videoElement.videoWidth ? this.videoElement : this.imageElement
+      const imageOriginalWidth = sourceElement.videoWidth || sourceElement.naturalWidth
+      const imageOriginalHeight = sourceElement.videoHeight || sourceElement.naturalHeight
       const scaleX = imageOriginalWidth / this.imageWidth
       const scaleY = imageOriginalHeight / this.imageHeight
 
-      // Coordonnées relatives à l'image
       const relativeX = pos.x - this.position.x
       const relativeY = pos.y - this.position.y
 
-      // Coordonnées dans l'image originale
       const imageX = Math.round(relativeX * scaleX)
       const imageY = Math.round(relativeY * scaleY)
 
       this.points.push({
         id: Date.now(),
-        x: pos.x, // Utiliser directement les coordonnées du clic
+        x: pos.x,
         y: pos.y,
         type: type,
         color: type === 'positive' ? '#4CAF50' : '#f44336'
@@ -507,11 +621,8 @@ export default {
 
     handleKeyDown(e) {
       if (e.key === 'Delete' && this.selectedId) {
-        // Supprimer l'élément des rectangles s'il y est
         this.rectangles = this.rectangles.filter(rect => rect.id !== this.selectedId)
-        // Supprimer l'élément des points s'il y est
         this.points = this.points.filter(point => point.id !== this.selectedId)
-        // Réinitialiser la sélection
         this.selectedId = null
         console.log('Element deleted:', this.selectedId)
       }
@@ -522,17 +633,15 @@ export default {
       if (!rect) return []
 
       return [
-        // Coins
-        { position: 'nw', x: rect.x, y: rect.y },                           // Nord-Ouest
-        { position: 'ne', x: rect.x + rect.width, y: rect.y },             // Nord-Est
-        { position: 'se', x: rect.x + rect.width, y: rect.y + rect.height }, // Sud-Est
-        { position: 'sw', x: rect.x, y: rect.y + rect.height },            // Sud-Ouest
+        { position: 'nw', x: rect.x, y: rect.y },
+        { position: 'ne', x: rect.x + rect.width, y: rect.y },
+        { position: 'se', x: rect.x + rect.width, y: rect.y + rect.height },
+        { position: 'sw', x: rect.x, y: rect.y + rect.height },
         
-        // Côtés
-        { position: 'n', x: rect.x + rect.width/2, y: rect.y },              // Nord
-        { position: 'e', x: rect.x + rect.width, y: rect.y + rect.height/2 }, // Est
-        { position: 's', x: rect.x + rect.width/2, y: rect.y + rect.height }, // Sud
-        { position: 'w', x: rect.x, y: rect.y + rect.height/2 }              // Ouest
+        { position: 'n', x: rect.x + rect.width/2, y: rect.y },
+        { position: 'e', x: rect.x + rect.width, y: rect.y + rect.height/2 },
+        { position: 's', x: rect.x + rect.width/2, y: rect.y + rect.height },
+        { position: 'w', x: rect.x, y: rect.y + rect.height/2 }
       ]
     },
 
@@ -543,7 +652,6 @@ export default {
       const stage = this.$refs.stage.getStage()
       const pos = stage.getPointerPosition()
 
-      // Garder les valeurs originales pour les calculs
       const originalX = rect.x
       const originalY = rect.y
       const originalWidth = rect.width
@@ -551,27 +659,27 @@ export default {
       let newWidth, newHeight
 
       switch (position) {
-        case 'e': // Est
+        case 'e':
           rect.width = Math.max(10, pos.x - rect.x)
           break
-        case 'w': // Ouest
+        case 'w':
           newWidth = originalWidth + (originalX - pos.x)
           if (newWidth >= 10) {
             rect.x = pos.x
             rect.width = newWidth
           }
           break
-        case 'n': // Nord
+        case 'n':
           newHeight = originalHeight + (originalY - pos.y)
           if (newHeight >= 10) {
             rect.y = pos.y
             rect.height = newHeight
           }
           break
-        case 's': // Sud
+        case 's':
           rect.height = Math.max(10, pos.y - rect.y)
           break
-        case 'nw': // Nord-Ouest
+        case 'nw':
           if (originalWidth + (originalX - pos.x) >= 10) {
             rect.x = pos.x
             rect.width = originalWidth + (originalX - pos.x)
@@ -581,18 +689,18 @@ export default {
             rect.height = originalHeight + (originalY - pos.y)
           }
           break
-        case 'ne': // Nord-Est
+        case 'ne':
           rect.width = Math.max(10, pos.x - rect.x)
           if (originalHeight + (originalY - pos.y) >= 10) {
             rect.y = pos.y
             rect.height = originalHeight + (originalY - pos.y)
           }
           break
-        case 'se': // Sud-Est
+        case 'se':
           rect.width = Math.max(10, pos.x - rect.x)
           rect.height = Math.max(10, pos.y - rect.y)
           break
-        case 'sw': // Sud-Ouest
+        case 'sw':
           if (originalWidth + (originalX - pos.x) >= 10) {
             rect.x = pos.x
             rect.width = originalWidth + (originalX - pos.x)
@@ -603,20 +711,18 @@ export default {
     },
 
     validatePoints() {
-      // Émettre un événement avec les points actuels
       this.$emit('points-validated', this.points)
-      this.points = [] // Réinitialiser les points après validation
-      this.currentTool = 'arrow' // Revenir à l'outil de sélection
+      this.points = []
+      this.currentTool = 'arrow'
     },
 
     cancelPoints() {
-      this.points = [] // Supprimer tous les points
-      this.currentTool = 'arrow' // Revenir à l'outil de sélection
+      this.points = []
+      this.currentTool = 'arrow'
     }
   },
 
   watch: {
-    // Surveiller les changements de dimensions du conteneur
     'stageConfig.width'() {
       this.$nextTick(() => {
         this.updateDimensions()

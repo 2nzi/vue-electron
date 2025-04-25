@@ -157,6 +157,9 @@ export default {
     togglePlayPause() {
       this.isPlaying = !this.isPlaying
       
+      // Mettre à jour le store pour que VideoSection soit informé
+      this.videoStore.isPlaying = this.isPlaying
+      
       if (this.videoElement) {
         if (this.isPlaying) {
           this.videoElement.play()
@@ -179,6 +182,9 @@ export default {
       if (this.videoElement) {
         this.videoElement.currentTime = this.currentTime
       }
+      
+      // Mettre à jour le store pour que VideoSection soit informé
+      this.videoStore.currentTime = this.currentTime
     },
     
     startTimeUpdate() {
@@ -186,11 +192,17 @@ export default {
       const updateTime = () => {
         if (this.videoElement) {
           this.currentTime = this.videoElement.currentTime
+          // Mettre à jour le store à chaque frame
+          this.videoStore.currentTime = this.currentTime
         } else {
           // Simulation pour test
           this.currentTime = Math.min(this.currentTime + 0.03, this.duration)
+          // Mettre à jour le store même en mode simulation
+          this.videoStore.currentTime = this.currentTime
+          
           if (this.currentTime >= this.duration) {
             this.isPlaying = false
+            this.videoStore.isPlaying = false
             this.stopTimeUpdate()
             return
           }

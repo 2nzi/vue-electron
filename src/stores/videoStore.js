@@ -4,7 +4,9 @@ export const useVideoStore = defineStore('video', {
   state: () => ({
     videos: [],
     selectedVideo: null,
-    defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw'
+    defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw',
+    currentTime: 0,
+    isPlaying: false
   }),
   
   actions: {
@@ -12,8 +14,16 @@ export const useVideoStore = defineStore('video', {
       this.videos = videos
     },
     
-    selectVideo(video) {
+    setSelectedVideo(video) {
       this.selectedVideo = video
+    },
+    
+    setCurrentTime(time) {
+      this.currentTime = time
+    },
+    
+    setIsPlaying(isPlaying) {
+      this.isPlaying = isPlaying
     },
     
     async loadVideosFromFolder(folderPath) {
@@ -26,7 +36,7 @@ export const useVideoStore = defineStore('video', {
         
         // Sélectionner automatiquement la première vidéo si elle existe
         if (this.videos.length > 0) {
-          this.selectVideo(this.videos[0])
+          this.setSelectedVideo(this.videos[0])
         }
         
         return this.videos
