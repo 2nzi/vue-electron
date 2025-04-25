@@ -62,7 +62,7 @@
         <v-layer ref="layer">
           <v-image
             :config="{
-              image: imageElement,
+              image: videoElement,
               width: imageWidth,
               height: imageHeight,
               x: position.x,
@@ -215,9 +215,7 @@ export default {
 
   data() {
     return {
-      imageElement: null,
       videoElement: null,
-      currentFrame: null,
       imageWidth: 0,
       imageHeight: 0,
       position: { x: 0, y: 0 },
@@ -237,16 +235,16 @@ export default {
       dragStartPos: { x: 0, y: 0 },
       resizing: false,
       resizeTimeout: null,
+      animationId: null,
+      videoStore: useVideoStore(),
     }
   },
 
   mounted() {
-    // Initialiser l'élément image sans source par défaut
-    this.imageElement = new Image()
-    
     // Créer l'élément vidéo
     this.videoElement = document.createElement('video')
     this.videoElement.crossOrigin = 'anonymous'
+    this.videoElement.muted = true // Important pour l'autoplay dans certains navigateurs
     
     // Écouter les événements de la vidéo
     this.videoElement.addEventListener('loadedmetadata', this.handleVideoLoaded)
@@ -264,7 +262,10 @@ export default {
     
     if (this.videoElement) {
       this.videoElement.removeEventListener('loadedmetadata', this.handleVideoLoaded)
+      this.videoElement.pause()
     }
+    
+    this.stopAnimation()
   },
 
   computed: {
@@ -275,7 +276,6 @@ export default {
 
   methods: {
     subscribeToVideoStore() {
-      // Utiliser le store vidéo pour obtenir la vidéo sélectionnée
       const videoStore = useVideoStore()
       
       // Observer les changements dans le store
@@ -295,8 +295,10 @@ export default {
         () => videoStore.currentTime,
         (newTime) => {
           if (this.videoElement && newTime !== undefined) {
-            console.log('Mise à jour du temps dans VideoSection:', newTime)
-            this.updateCurrentFrame(newTime)
+            // Seulement mettre à jour si la différence est significative
+            if (Math.abs(this.videoElement.currentTime - newTime) > 0.1) {
+              this.videoElement.currentTime = newTime
+            }
           }
         }
       )
@@ -307,12 +309,9 @@ export default {
         (isPlaying) => {
           console.log('État de lecture changé dans VideoSection:', isPlaying)
           if (isPlaying) {
-            // Pas besoin de jouer la vidéo ici, nous capturons juste les frames
+            this.playVideo()
           } else {
-            // Assurez-vous que la vidéo est bien à la position actuelle
-            if (this.videoElement && videoStore.currentTime !== undefined) {
-              this.updateCurrentFrame(videoStore.currentTime)
-            }
+            this.pauseVideo()
           }
         }
       )
@@ -321,73 +320,63 @@ export default {
     loadVideo(videoPath) {
       if (!videoPath) return
       
+      // Arrêter toute animation en cours
+      this.stopAnimation()
+      
       this.videoElement.src = videoPath
       this.videoElement.load()
     },
     
     handleVideoLoaded() {
       console.log('Vidéo chargée, dimensions:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight)
-      
-      this.frameCanvas = document.createElement('canvas')
-      this.frameContext = this.frameCanvas.getContext('2d')
-      
-      this.frameCanvas.width = this.videoElement.videoWidth
-      this.frameCanvas.height = this.videoElement.videoHeight
-      
-      this.captureVideoFrame(0)
-      
       this.initializeView()
+      
+      // Démarrer l'animation pour le rendu fluide
+      this.startAnimation()
     },
     
-    updateCurrentFrame(time) {
-      if (!this.videoElement || !this.frameContext) return
+    playVideo() {
+      if (!this.videoElement) return
       
-      console.log('Capture de frame à:', time)
-      // Positionner la vidéo au temps spécifié
-      this.videoElement.currentTime = time
-      
-      // Capturer la frame à ce moment
-      this.captureVideoFrame(time)
+      this.videoElement.play()
+      this.startAnimation()
     },
     
-    async captureVideoFrame(time) {
-      if (!this.videoElement || !this.frameContext) return
+    pauseVideo() {
+      if (!this.videoElement) return
       
-      // Positionner la vidéo au temps spécifié
-      this.videoElement.currentTime = time
+      this.videoElement.pause()
+    },
+    
+    startAnimation() {
+      // Arrêter l'animation existante si elle existe
+      this.stopAnimation()
       
-      // Attendre que la vidéo soit positionnée
-      await new Promise(resolve => {
-        const seekHandler = () => {
-          // Dessiner la frame sur le canvas
-          this.frameContext.drawImage(
-            this.videoElement, 
-            0, 0, 
-            this.videoElement.videoWidth, 
-            this.videoElement.videoHeight
-          )
-          
-          // Convertir le canvas en image
-          const frameUrl = this.frameCanvas.toDataURL('image/jpeg')
-          
-          // Créer une nouvelle image avec cette frame
-          const frameImage = new Image()
-          frameImage.onload = () => {
-            this.currentFrame = frameImage
-            this.imageElement = frameImage // Remplacer l'image par la frame actuelle
-            this.updateDimensions()
-            resolve()
-          }
-          frameImage.src = frameUrl
-          
-          // Supprimer l'écouteur après utilisation
-          this.videoElement.removeEventListener('seeked', seekHandler)
-        }
+      // Utiliser l'API de vue-konva pour accéder à l'animation
+      const layer = this.$refs.layer.getNode()
+      
+      // Créer une fonction d'animation qui sera appelée à chaque frame
+      const animate = () => {
+        // Forcer le rafraîchissement du layer
+        layer.batchDraw()
         
-        this.videoElement.addEventListener('seeked', seekHandler, { once: true })
-      })
+        // Continuer l'animation si on est toujours en lecture
+        if (this.videoStore?.isPlaying) {
+          this.animationId = requestAnimationFrame(animate)
+        }
+      }
+      
+      // Démarrer l'animation
+      this.animationId = requestAnimationFrame(animate)
     },
-
+    
+    stopAnimation() {
+      if (this.animationId) {
+        cancelAnimationFrame(this.animationId)
+        this.animationId = null
+      }
+    },
+    
     initializeView() {
       this.$nextTick(() => {
         this.updateDimensions()
@@ -405,21 +394,19 @@ export default {
 
     updateDimensions() {
       const container = this.$refs.container
-      if (!container || !this.imageElement) return
+      if (!container || !this.videoElement) return
 
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
-      const img = this.currentFrame || this.imageElement
-      
-      const imageRatio = img.naturalWidth / img.naturalHeight
+      const videoRatio = this.videoElement.videoWidth / this.videoElement.videoHeight
 
       let width = containerWidth
-      let height = width / imageRatio
+      let height = width / videoRatio
 
       if (height > containerHeight) {
         height = containerHeight
-        width = height * imageRatio
+        width = height * videoRatio
       }
 
       this.stageConfig.width = containerWidth
@@ -562,8 +549,8 @@ export default {
         y: this.rectangleStart.y - this.position.y
       }
 
-      const imageOriginalWidth = this.imageElement.naturalWidth
-      const imageOriginalHeight = this.imageElement.naturalHeight
+      const imageOriginalWidth = this.videoElement.videoWidth
+      const imageOriginalHeight = this.videoElement.videoHeight
       const scaleX = imageOriginalWidth / this.imageWidth
       const scaleY = imageOriginalHeight / this.imageHeight
 
@@ -596,7 +583,7 @@ export default {
     },
 
     addPoint(pos, type) {
-      const sourceElement = this.videoElement.videoWidth ? this.videoElement : this.imageElement
+      const sourceElement = this.videoElement.videoWidth ? this.videoElement : this.videoElement
       const imageOriginalWidth = sourceElement.videoWidth || sourceElement.naturalWidth
       const imageOriginalHeight = sourceElement.videoHeight || sourceElement.naturalHeight
       const scaleX = imageOriginalWidth / this.imageWidth
