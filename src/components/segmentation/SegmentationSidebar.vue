@@ -7,12 +7,12 @@
       </svg>
     </button>
 
-    <div class="video-list" v-if="videos.length">
+    <div class="video-list" v-if="videoStore.videos.length">
       <div 
-        v-for="video in videos" 
+        v-for="video in videoStore.videos" 
         :key="video.path"
         class="video-item"
-        :class="{ active: selectedVideo === video.path }"
+        :class="{ active: videoStore.selectedVideo?.path === video.path }"
         @click="selectVideo(video)"
       >
         {{ video.name }}
@@ -22,20 +22,30 @@
 </template>
 
 <script>
+import { useVideoStore } from '../../stores/videoStore'
+
 export default {
   name: 'SegmentationSidebar',
 
   data() {
+    const videoStore = useVideoStore()
     return {
-      videos: [],
-      selectedVideo: null,
-      defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw'
+      videoStore
     }
   },
 
+  // watch: {
+  //   'videoStore.selectedVideo': {
+  //     handler(newVideo) {
+  //       console.log('Vidéo sélectionnée:', newVideo)
+  //     },
+  //     deep: true
+  //   }
+  // },
+
   mounted() {
     // Charger le dossier par défaut au démarrage
-    this.loadVideosFromFolder(this.defaultPath)
+    this.videoStore.loadVideosFromFolder(this.videoStore.defaultPath)
   },
 
   methods: {
@@ -44,7 +54,7 @@ export default {
         const result = await window.electron.openDirectory()
         if (result && !result.canceled) {
           const folderPath = result.filePaths[0]
-          await this.loadVideosFromFolder(folderPath)
+          await this.videoStore.loadVideosFromFolder(folderPath)
         }
       } catch (error) {
         console.error('Error selecting folder:', error)
@@ -52,26 +62,8 @@ export default {
     },
 
     selectVideo(video) {
-      this.selectedVideo = video.path
+      this.videoStore.selectVideo(video)
       this.$emit('video-selected', video)
-    },
-
-    async loadVideosFromFolder(folderPath) {
-      try {
-        const videos = await window.electron.getVideosFromFolder(folderPath)
-        this.videos = videos.map(video => ({
-          name: video.name,
-          path: video.path
-        }))
-        
-        // Sélectionner automatiquement la première vidéo si elle existe
-        if (this.videos.length > 0) {
-          this.selectVideo(this.videos[0])
-        }
-      } catch (error) {
-        console.error('Error loading videos:', error)
-        this.videos = []
-      }
     }
   }
 }
