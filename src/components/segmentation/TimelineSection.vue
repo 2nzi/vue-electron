@@ -47,7 +47,6 @@
 
 <script>
 import { useVideoStore } from '../../stores/videoStore'
-import { useSegmentationStore } from '@/stores/segmentation'
 
 export default {
   name: 'TimelineSection',
@@ -94,16 +93,6 @@ export default {
         }
       },
       immediate: true
-    },
-    currentTime(newTime) {
-      // Mettre à jour le temps dans le store vidéo
-      this.videoStore.setCurrentTime(newTime)
-      
-      // Calculer et mettre à jour le numéro de frame dans le store de segmentation
-      const segmentationStore = useSegmentationStore()
-      const fps = this.videoStore.fps || 30
-      const frameNumber = Math.round(newTime * fps)
-      segmentationStore.setCurrentFrame(frameNumber)
     }
   },
   
@@ -112,17 +101,13 @@ export default {
       // Créer un élément vidéo temporaire pour charger la vidéo
       const tempVideo = document.createElement('video')
       tempVideo.src = videoPath
-      tempVideo.crossOrigin = 'anonymous'
+      tempVideo.crossOrigin = 'anonymous' // Nécessaire pour certaines sources vidéo
       
       // Attendre que les métadonnées soient chargées
       await new Promise(resolve => {
         tempVideo.addEventListener('loadedmetadata', () => {
           this.duration = tempVideo.duration
           this.videoElement = tempVideo
-          
-          // Mettre à jour la durée dans le store vidéo
-          this.videoStore.setDuration(tempVideo.duration)
-          
           resolve()
         })
         
