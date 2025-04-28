@@ -3,13 +3,20 @@
     <div class="timeline-container">
       <div class="objects-container">
         <object-item 
-          v-for="(object, index) in objects" 
+          v-for="object in objects" 
           :key="object.id" 
           :object-id="object.id"
-          :color-index="index"
+          :object-name="object.name"
+          :color="object.color"
+          :is-selected="selectedObjectId === object.id"
+          @click="selectObject(object.id)"
         />
-        <div class="add-object">
-          <button class="add-button">+</button>
+        <div class="add-object" v-if="objects.length === 0 || showAddButton">
+          <button class="add-button" @click="addNewObject">+</button>
+        </div>
+        <div class="empty-state" v-if="objects.length === 0">
+          <p>Aucun objet créé</p>
+          <p>Cliquez sur + pour ajouter un objet</p>
         </div>
       </div>
       <div class="timeline-tools"></div>
@@ -19,25 +26,44 @@
 
 <script>
 import ObjectItem from './ObjectItem.vue'
+import { useAnnotationStore } from '@/stores/annotationStore'
 
 export default {
   name: 'ObjectsTimelineSection',
   components: {
     ObjectItem
   },
+  
+  setup() {
+    const annotationStore = useAnnotationStore()
+    return { annotationStore }
+  },
+  
   data() {
     return {
-      objects: [
-        { id: 'Id1' },
-        { id: 'Id2' },
-        { id: 'Id3' },
-        { id: 'Id4' },
-        { id: 'Id5' },
-        { id: 'Id6' },
-        { id: 'Id7' },
-        { id: 'Id8' },
-        { id: 'Id9' },
-      ]
+      selectedObjectId: null,
+      showAddButton: true
+    }
+  },
+  
+  computed: {
+    objects() {
+      // Récupérer les objets depuis le store
+      return Object.values(this.annotationStore.objects)
+    }
+  },
+  
+  methods: {
+    selectObject(objectId) {
+      this.selectedObjectId = objectId
+      // Émettre un événement pour informer d'autres composants
+      this.$emit('object-selected', objectId)
+    },
+    
+    addNewObject() {
+      // Ajouter un nouvel objet et le sélectionner
+      const newObjectId = this.annotationStore.addObject()
+      this.selectObject(newObjectId)
     }
   }
 }
@@ -130,5 +156,16 @@ h3 {
 
 .add-button:hover {
   background: #3c3c3c;
+}
+
+.empty-state {
+  text-align: center;
+  color: #888;
+  padding: 20px 0;
+  font-size: 0.9rem;
+}
+
+.empty-state p {
+  margin: 5px 0;
 }
 </style> 

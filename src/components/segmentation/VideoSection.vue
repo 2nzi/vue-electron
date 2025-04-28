@@ -209,9 +209,24 @@
 
 <script>
 import { useVideoStore } from '@/stores/videoStore'
+import { useAnnotationStore } from '@/stores/annotationStore'
 
 export default {
   name: 'VideoSection',
+
+  props: {
+    selectedObjectId: {
+      type: String,
+      default: null
+    }
+  },
+
+  setup() {
+    const videoStore = useVideoStore()
+    const annotationStore = useAnnotationStore()
+    
+    return { videoStore, annotationStore }
+  },
 
   data() {
     return {
@@ -219,7 +234,6 @@ export default {
       imageWidth: 0,
       imageHeight: 0,
       position: { x: 0, y: 0 },
-      points: [],
       stageConfig: {
         width: 0,
         height: 0
@@ -228,7 +242,6 @@ export default {
       isDrawing: false,
       rectangleStart: { x: 0, y: 0 },
       rectangleSize: { width: 0, height: 0 },
-      rectangles: [],
       mousePosition: { x: null, y: null },
       selectedId: null,
       isDragging: false,
@@ -236,7 +249,8 @@ export default {
       resizing: false,
       resizeTimeout: null,
       animationId: null,
-      videoStore: useVideoStore(),
+      currentFrameNumber: 0,
+      localSelectedObjectId: this.selectedObjectId
     }
   },
 
@@ -254,6 +268,14 @@ export default {
     
     window.addEventListener('resize', this.handleWindowResize)
     window.addEventListener('keydown', this.handleKeyDown)
+    
+    // Ajouter un écouteur d'événement pour la mise à jour de frame pendant la lecture
+    this.videoElement.addEventListener('timeupdate', this.updateCurrentFrame)
+    
+    // Mettre à jour la frame initiale
+    this.$nextTick(() => {
+      this.updateCurrentFrame()
+    })
   },
 
   beforeUnmount() {
@@ -266,11 +288,79 @@ export default {
     }
     
     this.stopAnimation()
+    
+    // Supprimer l'écouteur d'événement
+    this.videoElement.removeEventListener('timeupdate', this.updateCurrentFrame)
   },
 
   computed: {
     isPointingMode() {
       return this.currentTool === 'positive' || this.currentTool === 'negative'
+    },
+    availableObjects() {
+      return Object.values(this.annotationStore.objects)
+    },
+    hasSelectedObject() {
+      return !!this.localSelectedObjectId
+    },
+    rectangles() {
+      const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || []
+      
+      // Convertir les annotations en rectangles pour l'affichage
+      return frameAnnotations
+        .filter(annotation => annotation.type === 'rectangle')
+        .map(annotation => {
+          const object = this.annotationStore.objects[annotation.objectId]
+          const color = object ? object.color : '#4CAF50'
+          
+          // Convertir les coordonnées originales en coordonnées d'affichage
+          const displayX = this.position.x + (annotation.x / this.scaleX)
+          const displayY = this.position.y + (annotation.y / this.scaleY)
+          const displayWidth = annotation.width / this.scaleX
+          const displayHeight = annotation.height / this.scaleY
+          
+          return {
+            id: annotation.id,
+            objectId: annotation.objectId,
+            x: displayX,
+            y: displayY,
+            width: displayWidth,
+            height: displayHeight,
+            color: color
+          }
+        })
+    },
+    points() {
+      const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || []
+      
+      // Convertir les annotations en points pour l'affichage
+      return frameAnnotations
+        .filter(annotation => annotation.type === 'point')
+        .map(annotation => {
+          const object = this.annotationStore.objects[annotation.objectId]
+          const color = object ? object.color : (annotation.pointType === 'positive' ? '#4CAF50' : '#f44336')
+          
+          // Convertir les coordonnées originales en coordonnées d'affichage
+          const displayX = this.position.x + (annotation.x / this.scaleX)
+          const displayY = this.position.y + (annotation.y / this.scaleY)
+          
+          return {
+            id: annotation.id,
+            objectId: annotation.objectId,
+            x: displayX,
+            y: displayY,
+            type: annotation.pointType,
+            color: color
+          }
+        })
+    },
+    scaleX() {
+      if (!this.videoElement || !this.imageWidth) return 1
+      return this.videoElement.videoWidth / this.imageWidth
+    },
+    scaleY() {
+      if (!this.videoElement || !this.imageHeight) return 1
+      return this.videoElement.videoHeight / this.imageHeight
     }
   },
 
@@ -456,6 +546,7 @@ export default {
         
         if (clickedRect) {
           this.selectedId = clickedRect.id
+          this.localSelectedObjectId = clickedRect.objectId
           this.isDragging = true
           this.dragStartPos = pointerPos
           console.log('Selected rectangle:', this.selectedId)
@@ -470,6 +561,7 @@ export default {
 
         if (clickedPoint) {
           this.selectedId = clickedPoint.id
+          this.localSelectedObjectId = clickedPoint.objectId
           this.isDragging = true
           this.dragStartPos = pointerPos
           console.log('Selected point:', this.selectedId)
@@ -477,11 +569,14 @@ export default {
         }
 
         this.selectedId = null
-        this.isDragging = false
       }
 
       switch(this.currentTool) {
         case 'rectangle':
+          if (!this.localSelectedObjectId) {
+            this.localSelectedObjectId = this.annotationStore.addObject()
+          }
+          
           this.isDrawing = true
           this.rectangleStart = {
             x: pointerPos.x,
@@ -561,12 +656,14 @@ export default {
         height: Math.round(this.rectangleSize.height * scaleY)
       }
 
-      this.rectangles.push({
-        id: Date.now(),
-        x: this.rectangleStart.x,
-        y: this.rectangleStart.y,
-        width: this.rectangleSize.width,
-        height: this.rectangleSize.height
+      // Ajouter l'annotation au store
+      this.annotationStore.addAnnotation(this.currentFrameNumber, {
+        objectId: this.localSelectedObjectId,
+        type: 'rectangle',
+        x: originalRect.x,
+        y: originalRect.y,
+        width: originalRect.width,
+        height: originalRect.height
       })
 
       console.log('Rectangle ajouté:', originalRect)
@@ -583,35 +680,38 @@ export default {
     },
 
     addPoint(pos, type) {
-      const sourceElement = this.videoElement.videoWidth ? this.videoElement : this.videoElement
-      const imageOriginalWidth = sourceElement.videoWidth || sourceElement.naturalWidth
-      const imageOriginalHeight = sourceElement.videoHeight || sourceElement.naturalHeight
-      const scaleX = imageOriginalWidth / this.imageWidth
-      const scaleY = imageOriginalHeight / this.imageHeight
-
+      if (!this.localSelectedObjectId) {
+        this.localSelectedObjectId = this.annotationStore.addObject()
+      }
+      
       const relativeX = pos.x - this.position.x
       const relativeY = pos.y - this.position.y
-
+      
+      const sourceElement = this.videoElement
+      const imageOriginalWidth = sourceElement.videoWidth
+      const imageOriginalHeight = sourceElement.videoHeight
+      const scaleX = imageOriginalWidth / this.imageWidth
+      const scaleY = imageOriginalHeight / this.imageHeight
+      
       const imageX = Math.round(relativeX * scaleX)
       const imageY = Math.round(relativeY * scaleY)
-
-      this.points.push({
-        id: Date.now(),
-        x: pos.x,
-        y: pos.y,
-        type: type,
-        color: type === 'positive' ? '#4CAF50' : '#f44336'
+      
+      this.annotationStore.addAnnotation(this.currentFrameNumber, {
+        objectId: this.localSelectedObjectId,
+        type: 'point',
+        x: imageX,
+        y: imageY,
+        pointType: type
       })
-
+      
       console.log('Point ajouté:', { x: imageX, y: imageY, type: type })
     },
 
     handleKeyDown(e) {
       if (e.key === 'Delete' && this.selectedId) {
-        this.rectangles = this.rectangles.filter(rect => rect.id !== this.selectedId)
-        this.points = this.points.filter(point => point.id !== this.selectedId)
+        this.annotationStore.removeAnnotation(this.currentFrameNumber, this.selectedId)
         this.selectedId = null
-        console.log('Element deleted:', this.selectedId)
+        console.log('Element deleted')
       }
     },
 
@@ -706,6 +806,22 @@ export default {
     cancelPoints() {
       this.points = []
       this.currentTool = 'arrow'
+    },
+
+    updateCurrentFrame() {
+      if (!this.videoElement) return
+      
+      const frameRate = this.annotationStore.currentSession.frameRate || 30
+      this.currentFrameNumber = Math.floor(this.videoElement.currentTime * frameRate)
+    },
+
+    selectObject(objectId) {
+      this.localSelectedObjectId = objectId
+      this.$emit('object-selected', objectId)
+    },
+
+    createNewObject() {
+      this.localSelectedObjectId = this.annotationStore.addObject()
     }
   },
 
@@ -719,6 +835,12 @@ export default {
       this.$nextTick(() => {
         this.updateDimensions()
       })
+    },
+    'videoStore.currentTime'() {
+      this.updateCurrentFrame()
+    },
+    selectedObjectId(newId) {
+      this.localSelectedObjectId = newId
     }
   },
 }
