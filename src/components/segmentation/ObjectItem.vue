@@ -1,5 +1,9 @@
 <template>
-  <div class="object-item">
+  <div 
+    class="object-item" 
+    :class="{ 'selected': isSelected }"
+    @click="toggleSelection"
+  >
     <div class="object-id">
       <span>{{ objectId }}</span>
     </div>
@@ -42,6 +46,20 @@ export default {
     const videoStore = useVideoStore()
     const timelineRef = ref(null)
     
+    // Vérifier si cet objet est actuellement sélectionné
+    const isSelected = computed(() => {
+      return annotationStore.selectedObjectId === props.objectId
+    })
+    
+    // Fonction pour basculer la sélection de l'objet
+    const toggleSelection = () => {
+      if (isSelected.value) {
+        annotationStore.deselectObject()
+      } else {
+        annotationStore.selectObject(props.objectId)
+      }
+    }
+    
     // Récupérer toutes les frames où cet objet a des annotations
     const annotatedFrames = computed(() => {
       const frames = []
@@ -79,7 +97,9 @@ export default {
       annotatedFrames,
       calculatePositionExact,
       getObjectColor,
-      timelineRef
+      timelineRef,
+      isSelected,
+      toggleSelection
     }
   }
 }
@@ -92,6 +112,19 @@ export default {
   margin-bottom: 18px;
   align-items: center;
   gap: 16px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  border-radius: 4px;
+  padding: 2px 4px;
+}
+
+.object-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.object-item.selected {
+  background-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.5);
 }
 
 .object-id {

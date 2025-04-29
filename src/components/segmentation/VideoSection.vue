@@ -250,7 +250,6 @@ export default {
       resizeTimeout: null,
       animationId: null,
       currentFrameNumber: 0,
-      localSelectedObjectId: this.selectedObjectId
     }
   },
 
@@ -301,7 +300,7 @@ export default {
       return Object.values(this.annotationStore.objects)
     },
     hasSelectedObject() {
-      return !!this.localSelectedObjectId
+      return !!this.annotationStore.selectedObjectId
     },
     rectangles() {
       const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || []
@@ -546,7 +545,6 @@ export default {
         
         if (clickedRect) {
           this.selectedId = clickedRect.id
-          this.localSelectedObjectId = clickedRect.objectId
           this.isDragging = true
           this.dragStartPos = pointerPos
           console.log('Selected rectangle:', this.selectedId)
@@ -561,7 +559,6 @@ export default {
 
         if (clickedPoint) {
           this.selectedId = clickedPoint.id
-          this.localSelectedObjectId = clickedPoint.objectId
           this.isDragging = true
           this.dragStartPos = pointerPos
           console.log('Selected point:', this.selectedId)
@@ -573,8 +570,8 @@ export default {
 
       switch(this.currentTool) {
         case 'rectangle':
-          if (!this.localSelectedObjectId) {
-            this.localSelectedObjectId = this.annotationStore.addObject()
+          if (!this.annotationStore.selectedObjectId) {
+            this.annotationStore.addObject()
           }
           
           this.isDrawing = true
@@ -658,7 +655,7 @@ export default {
 
       // Ajouter l'annotation au store
       this.annotationStore.addAnnotation(this.currentFrameNumber, {
-        objectId: this.localSelectedObjectId,
+        objectId: this.annotationStore.selectedObjectId,
         type: 'rectangle',
         x: originalRect.x,
         y: originalRect.y,
@@ -680,8 +677,8 @@ export default {
     },
 
     addPoint(pos, type) {
-      if (!this.localSelectedObjectId) {
-        this.localSelectedObjectId = this.annotationStore.addObject()
+      if (!this.annotationStore.selectedObjectId) {
+        this.annotationStore.addObject()
       }
       
       const relativeX = pos.x - this.position.x
@@ -697,7 +694,7 @@ export default {
       const imageY = Math.round(relativeY * scaleY)
       
       this.annotationStore.addAnnotation(this.currentFrameNumber, {
-        objectId: this.localSelectedObjectId,
+        objectId: this.annotationStore.selectedObjectId,
         type: 'point',
         x: imageX,
         y: imageY,
@@ -816,12 +813,12 @@ export default {
     },
 
     selectObject(objectId) {
-      this.localSelectedObjectId = objectId
+      this.annotationStore.selectObject(objectId)
       this.$emit('object-selected', objectId)
     },
 
     createNewObject() {
-      this.localSelectedObjectId = this.annotationStore.addObject()
+      this.annotationStore.addObject()
     }
   },
 
@@ -839,8 +836,8 @@ export default {
     'videoStore.currentTime'() {
       this.updateCurrentFrame()
     },
-    selectedObjectId(newId) {
-      this.localSelectedObjectId = newId
+    'annotationStore.selectedObjectId'(newId) {
+      console.log('Objet sélectionné changé:', newId)
     }
   },
 }

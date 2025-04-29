@@ -8,7 +8,7 @@
           :object-id="object.id"
           :object-name="object.name"
           :color="object.color"
-          :is-selected="selectedObjectId === object.id"
+          :is-selected="annotationStore.selectedObjectId === object.id"
           @click="selectObject(object.id)"
         />
         <div class="add-object" v-if="objects.length === 0 || showAddButton">
@@ -41,7 +41,6 @@ export default {
   
   data() {
     return {
-      selectedObjectId: null,
       showAddButton: true
     }
   },
@@ -55,15 +54,19 @@ export default {
   
   methods: {
     selectObject(objectId) {
-      this.selectedObjectId = objectId
+      // Utiliser l'action du store pour sélectionner l'objet
+      this.annotationStore.selectObject(objectId)
+      
       // Émettre un événement pour informer d'autres composants
       this.$emit('object-selected', objectId)
     },
     
     addNewObject() {
-      // Ajouter un nouvel objet et le sélectionner
+      // Ajouter un nouvel objet via le store
       const newObjectId = this.annotationStore.addObject()
-      this.selectObject(newObjectId)
+      
+      // Émettre un événement pour informer d'autres composants
+      this.$emit('object-selected', newObjectId)
     }
   }
 }

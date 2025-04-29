@@ -22,37 +22,49 @@ export const useAnnotationStore = defineStore('annotations', {
     // Annotations par frame
     frameAnnotations: {
       // Exemple: "15": [{ objectId: "object-1", type: "rectangle", x: 100, y: 100, width: 200, height: 150 }]
-    }
+    },
+    selectedObjectId: null
   }),
   
   actions: {
-    // Ajouter un nouvel objet
-    addObject(name, color) {
-      const id = `Id${this.objectIdCounter}`
-      this.objects[id] = {
-        id,
-        name: name || `Objet ${this.objectIdCounter}`,
-        color: color || this.getRandomColor()
-      }
-      this.objectIdCounter++
-      return id
+    // Sélectionner un objet
+    selectObject(objectId) {
+      this.selectedObjectId = objectId
+      console.log(`Objet sélectionné: ${objectId}`)
     },
     
-    // Ajouter une annotation à une frame
+    // Désélectionner l'objet actuel
+    deselectObject() {
+      this.selectedObjectId = null
+    },
+    
+    // Ajouter une annotation pour l'objet sélectionné à la frame actuelle
     addAnnotation(frameNumber, annotation) {
-      // Convertir en string pour utiliser comme clé
-      const frameKey = frameNumber.toString()
-      
-      // Initialiser le tableau si nécessaire
-      if (!this.frameAnnotations[frameKey]) {
-        this.frameAnnotations[frameKey] = []
+      // S'assurer que le tableau d'annotations pour cette frame existe
+      if (!this.frameAnnotations[frameNumber]) {
+        this.frameAnnotations[frameNumber] = []
       }
       
-      // Ajouter l'annotation
-      this.frameAnnotations[frameKey].push({
-        id: Date.now().toString(),
-        ...annotation
-      })
+      // Ajouter l'annotation au tableau
+      this.frameAnnotations[frameNumber].push(annotation)
+      console.log(`Annotation ajoutée pour l'objet ${annotation.objectId} à la frame ${frameNumber}`)
+    },
+    
+    // Ajouter un nouvel objet
+    addObject(objectData = {}) {
+      const objectId = `Id-${this.objectIdCounter++}`
+      
+      this.objects[objectId] = {
+        id: objectId,
+        name: objectData.name || `Objet ${this.objectIdCounter - 1}`,
+        color: objectData.color || this.getRandomColor(),
+        // Autres propriétés selon vos besoins
+      }
+      
+      // Sélectionner automatiquement le nouvel objet
+      this.selectObject(objectId)
+      
+      return objectId
     },
     
     // Récupérer les annotations pour une frame
