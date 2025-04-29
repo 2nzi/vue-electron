@@ -250,6 +250,9 @@ export default {
       resizeTimeout: null,
       animationId: null,
       currentFrameNumber: 0,
+      originalVideoPath: null,
+      proxyVideoPath: null,
+      isUsingProxy: true,
     }
   },
 
@@ -412,8 +415,88 @@ export default {
       // Arrêter toute animation en cours
       this.stopAnimation()
       
-      this.videoElement.src = videoPath
+      this.originalVideoPath = videoPath
+      
+      // Vérifier si un proxy existe déjà ou en créer un
+      this.createOrLoadProxy(videoPath)
+        .then(proxyPath => {
+          this.proxyVideoPath = proxyPath
+          
+          // Charger le proxy si l'option est activée, sinon charger l'original
+          const sourceToLoad = this.isUsingProxy ? proxyPath : videoPath
+          this.videoElement.src = sourceToLoad
+          this.videoElement.load()
+        })
+        .catch(err => {
+          console.error("Erreur lors de la création du proxy:", err)
+          // En cas d'erreur, charger la vidéo originale
+          this.videoElement.src = videoPath
+          this.videoElement.load()
+        })
+    },
+    
+    async createOrLoadProxy(originalPath) {
+      // Générer un nom de fichier pour le proxy
+      const proxyPath = this.generateProxyPath(originalPath)
+      
+      // Vérifier si le proxy existe déjà
+      const proxyExists = await this.checkIfFileExists(proxyPath)
+      
+      if (proxyExists) {
+        console.log("Proxy vidéo existant trouvé:", proxyPath)
+        return proxyPath
+      }
+      
+      // Créer un nouveau proxy
+      console.log("Création d'un nouveau proxy vidéo...")
+      return this.createVideoProxy(originalPath, proxyPath)
+    },
+    
+    generateProxyPath(originalPath) {
+      // Exemple: transformer "/videos/original.mp4" en "/videos/original_proxy.mp4"
+      const pathParts = originalPath.split('.')
+      const extension = pathParts.pop()
+      return `${pathParts.join('.')}_proxy.${extension}`
+    },
+    
+    async checkIfFileExists(filePath) {
+      // Vérifier si nous sommes dans Electron
+      if (window.electron) {
+        // Utiliser l'API Electron via le pont contextIsolation
+        return window.electron.checkFileExists(filePath);
+      } else {
+        // Version de développement ou web: simuler l'existence du fichier
+        console.warn("Environnement non-Electron détecté, impossible de vérifier l'existence du fichier");
+        return false;
+      }
+    },
+    
+    async createVideoProxy(originalPath, proxyPath) {
+      // Vérifier si nous sommes dans Electron
+      if (window.electron) {
+        // Utiliser l'API Electron via le pont contextIsolation
+        return window.electron.createVideoProxy(originalPath, proxyPath);
+      } else {
+        // Version de développement ou web: utiliser la vidéo originale
+        console.warn("Environnement non-Electron détecté, impossible de créer un proxy");
+        return originalPath; // Retourner le chemin original comme fallback
+      }
+    },
+    
+    toggleProxyMode() {
+      this.isUsingProxy = !this.isUsingProxy
+      
+      // Sauvegarder la position actuelle
+      const currentTime = this.videoElement.currentTime
+      
+      // Charger la vidéo appropriée
+      this.videoElement.src = this.isUsingProxy ? this.proxyVideoPath : this.originalVideoPath
       this.videoElement.load()
+      
+      // Restaurer la position après le chargement
+      this.videoElement.addEventListener('loadedmetadata', () => {
+        this.videoElement.currentTime = currentTime
+      }, { once: true })
     },
     
     handleVideoLoaded() {

@@ -76,7 +76,6 @@ export default {
 .objects-timeline-section {
   background: #363636;
   border-radius: 8px;
-  padding: 12px;
   height: 100%;
   display: flex;
   flex-direction: column;

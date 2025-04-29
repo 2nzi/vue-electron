@@ -93,7 +93,7 @@
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("const { contextBridge, ipcRenderer } = __webpack_require__(/*! electron */ \"electron\")\r\n\r\ncontextBridge.exposeInMainWorld('electron', {\r\n  openDirectory: async () => {\r\n    try {\r\n      return await ipcRenderer.invoke('dialog:openDirectory')\r\n    } catch (error) {\r\n      console.error('Error opening directory:', error)\r\n      throw error\r\n    }\r\n  },\r\n  getVideosFromFolder: async (folderPath) => {\r\n    try {\r\n      return await ipcRenderer.invoke('folder:getVideos', folderPath)\r\n    } catch (error) {\r\n      console.error('Error reading directory:', error)\r\n      throw error\r\n    }\r\n  },\r\n  readVideoFile: async (videoPath) => {\r\n    try {\r\n      const buffer = await ipcRenderer.invoke('video:readFile', videoPath)\r\n      return buffer\r\n    } catch (error) {\r\n      console.error('Error reading video:', error)\r\n      throw error\r\n    }\r\n  },\r\n  getFirstFrame: async (videoPath) => {\r\n    try {\r\n      return await ipcRenderer.invoke('video:getFirstFrame', videoPath)\r\n    } catch (error) {\r\n      console.error('Error extracting frame:', error)\r\n      throw error\r\n    }\r\n  },\r\n  saveCalibration: async (videoPath, calibrationData, outputFolder) => {\r\n    try {\r\n      return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData, outputFolder })\r\n    } catch (error) {\r\n      console.error('Error saving calibration:', error)\r\n      throw error\r\n    }\r\n  }\r\n}) \n\n//# sourceURL=webpack:///./src/preload.js?");
+eval("const { contextBridge, ipcRenderer } = __webpack_require__(/*! electron */ \"electron\")\r\nconst fs = __webpack_require__(/*! fs */ \"fs\")\r\nconst { exec } = __webpack_require__(/*! child_process */ \"child_process\")\r\n\r\ncontextBridge.exposeInMainWorld('electron', {\r\n  openDirectory: async () => {\r\n    try {\r\n      return await ipcRenderer.invoke('dialog:openDirectory')\r\n    } catch (error) {\r\n      console.error('Error opening directory:', error)\r\n      throw error\r\n    }\r\n  },\r\n  getVideosFromFolder: async (folderPath) => {\r\n    try {\r\n      return await ipcRenderer.invoke('folder:getVideos', folderPath)\r\n    } catch (error) {\r\n      console.error('Error reading directory:', error)\r\n      throw error\r\n    }\r\n  },\r\n  readVideoFile: async (videoPath) => {\r\n    try {\r\n      const buffer = await ipcRenderer.invoke('video:readFile', videoPath)\r\n      return buffer\r\n    } catch (error) {\r\n      console.error('Error reading video:', error)\r\n      throw error\r\n    }\r\n  },\r\n  getFirstFrame: async (videoPath) => {\r\n    try {\r\n      return await ipcRenderer.invoke('video:getFirstFrame', videoPath)\r\n    } catch (error) {\r\n      console.error('Error extracting frame:', error)\r\n      throw error\r\n    }\r\n  },\r\n  saveCalibration: async (videoPath, calibrationData, outputFolder) => {\r\n    try {\r\n      return await ipcRenderer.invoke('calibration:save', { videoPath, calibrationData, outputFolder })\r\n    } catch (error) {\r\n      console.error('Error saving calibration:', error)\r\n      throw error\r\n    }\r\n  },\r\n  checkFileExists: (filePath) => {\r\n    return new Promise((resolve) => {\r\n      fs.access(filePath, fs.constants.F_OK, (err) => {\r\n        resolve(!err)\r\n      })\r\n    })\r\n  },\r\n  createVideoProxy: (originalPath, proxyPath) => {\r\n    return new Promise((resolve, reject) => {\r\n      const command = `ffmpeg -i \"${originalPath}\" -vf \"scale=854:480\" -c:v libx264 -crf 28 -preset fast -c:a aac -b:a 128k \"${proxyPath}\"`\r\n      \r\n      exec(command, (error) => {\r\n        if (error) {\r\n          console.error(\"Erreur FFmpeg:\", error)\r\n          reject(error)\r\n          return\r\n        }\r\n        resolve(proxyPath)\r\n      })\r\n    })\r\n  }\r\n}) \n\n//# sourceURL=webpack:///./src/preload.js?");
 
 /***/ }),
 
@@ -108,6 +108,17 @@ eval("module.exports = __webpack_require__(/*! C:\\Users\\antoi\\Documents\\Work
 
 /***/ }),
 
+/***/ "child_process":
+/*!********************************!*\
+  !*** external "child_process" ***!
+  \********************************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("module.exports = require(\"child_process\");\n\n//# sourceURL=webpack:///external_%22child_process%22?");
+
+/***/ }),
+
 /***/ "electron":
 /*!***************************!*\
   !*** external "electron" ***!
@@ -116,6 +127,17 @@ eval("module.exports = __webpack_require__(/*! C:\\Users\\antoi\\Documents\\Work
 /***/ (function(module, exports) {
 
 eval("module.exports = require(\"electron\");\n\n//# sourceURL=webpack:///external_%22electron%22?");
+
+/***/ }),
+
+/***/ "fs":
+/*!*********************!*\
+  !*** external "fs" ***!
+  \*********************/
+/*! no static exports found */
+/***/ (function(module, exports) {
+
+eval("module.exports = require(\"fs\");\n\n//# sourceURL=webpack:///external_%22fs%22?");
 
 /***/ })
 

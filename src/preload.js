@@ -1,4 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron')
+const fs = require('fs')
+const { exec } = require('child_process')
 
 contextBridge.exposeInMainWorld('electron', {
   openDirectory: async () => {
@@ -41,5 +43,26 @@ contextBridge.exposeInMainWorld('electron', {
       console.error('Error saving calibration:', error)
       throw error
     }
+  },
+  checkFileExists: (filePath) => {
+    return new Promise((resolve) => {
+      fs.access(filePath, fs.constants.F_OK, (err) => {
+        resolve(!err)
+      })
+    })
+  },
+  createVideoProxy: (originalPath, proxyPath) => {
+    return new Promise((resolve, reject) => {
+      const command = `ffmpeg -i "${originalPath}" -vf "scale=854:480" -c:v libx264 -crf 28 -preset fast -c:a aac -b:a 128k "${proxyPath}"`
+      
+      exec(command, (error) => {
+        if (error) {
+          console.error("Erreur FFmpeg:", error)
+          reject(error)
+          return
+        }
+        resolve(proxyPath)
+      })
+    })
   }
 }) 
