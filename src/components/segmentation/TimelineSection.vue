@@ -98,28 +98,19 @@ export default {
   
   methods: {
     async loadVideo(videoPath) {
-      // Créer un élément vidéo temporaire pour charger la vidéo
-      const tempVideo = document.createElement('video')
-      tempVideo.src = videoPath
-      tempVideo.crossOrigin = 'anonymous' // Nécessaire pour certaines sources vidéo
-      
-      // Attendre que les métadonnées soient chargées
-      await new Promise(resolve => {
-        tempVideo.addEventListener('loadedmetadata', () => {
-          this.duration = tempVideo.duration
-          this.videoElement = tempVideo
-          resolve()
-        })
+      try {
+        // Utiliser la méthode du store pour charger la vidéo
+        const { duration, videoElement } = await this.videoStore.loadVideoMetadata(videoPath)
         
-        // En cas d'erreur
-        tempVideo.addEventListener('error', () => {
-          console.error('Erreur lors du chargement de la vidéo')
-          resolve()
-        })
-      })
-      
-      // Générer les vignettes
-      this.generateThumbnails(tempVideo)
+        // Mettre à jour les propriétés locales
+        this.duration = duration
+        this.videoElement = videoElement
+        
+        // Générer les vignettes
+        this.generateThumbnails(videoElement)
+      } catch (error) {
+        console.error('Erreur lors du chargement de la vidéo:', error)
+      }
     },
     
     async generateThumbnails(videoEl) {

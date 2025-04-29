@@ -3,13 +3,28 @@
     <div class="object-id">
       <span>{{ objectId }}</span>
     </div>
-    <div class="object-timeline">
+    <div class="object-timeline" ref="timelineRef">
       <div class="timeline-line"></div>
+      <!-- Points pour chaque annotation -->
+      <div 
+        v-for="(frameKey, index) in annotatedFrames" 
+        :key="index"
+        class="annotation-point"
+        :style="{
+          left: `${calculatePositionExact(parseInt(frameKey))}%`,
+          backgroundColor: getObjectColor
+        }"
+        :title="`Frame ${frameKey}`"
+      ></div>
     </div>
   </div>
 </template>
 
 <script>
+import { useAnnotationStore } from '@/stores/annotationStore'
+import { useVideoStore } from '@/stores/videoStore'
+import { computed, ref } from 'vue'
+
 export default {
   name: 'ObjectItem',
   props: {
@@ -21,6 +36,51 @@ export default {
       type: Number,
       default: 0
     }
+  },
+  setup(props) {
+    const annotationStore = useAnnotationStore()
+    const videoStore = useVideoStore()
+    const timelineRef = ref(null)
+    
+    // Récupérer toutes les frames où cet objet a des annotations
+    const annotatedFrames = computed(() => {
+      const frames = []
+      Object.keys(annotationStore.frameAnnotations).forEach(frameKey => {
+        const hasObjectAnnotation = annotationStore.frameAnnotations[frameKey].some(
+          annotation => annotation.objectId === props.objectId
+        )
+        if (hasObjectAnnotation) {
+          frames.push(frameKey)
+        }
+      })
+      return frames
+    })
+    
+    // Obtenir la couleur de l'objet
+    const getObjectColor = computed(() => {
+      return annotationStore.objects[props.objectId]?.color || '#4CAF50'
+    })
+    
+    // Calculer la position en pourcentage pour une frame donnée
+    const calculatePositionExact = (frameNumber) => {
+      const frameRate = annotationStore.currentSession.frameRate || 30
+      const timeInSeconds = frameNumber / frameRate
+      const videoDuration = videoStore.duration || videoStore.selectedVideo?.duration || 0
+      
+      if (!videoDuration || videoDuration <= 0) {
+        console.warn('Attention: Durée de vidéo non disponible, utilisation d\'une valeur par défaut')
+        return 0 // Ou retourner une position par défaut
+      }
+      
+      return (timeInSeconds / videoDuration) * 100
+    }
+    
+    return {
+      annotatedFrames,
+      calculatePositionExact,
+      getObjectColor,
+      timelineRef
+    }
   }
 }
 </script>
@@ -31,6 +91,7 @@ export default {
   height: 24px;
   margin-bottom: 18px;
   align-items: center;
+  gap: 16px;
 }
 
 .object-id {
@@ -57,5 +118,15 @@ export default {
   height: 1px;
   width: 100%;
   background-color: white;
+}
+
+.annotation-point {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background-color: #4CAF50;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
 }
 </style> 

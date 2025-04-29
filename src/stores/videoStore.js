@@ -6,7 +6,8 @@ export const useVideoStore = defineStore('video', {
     selectedVideo: null,
     defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw',
     currentTime: 0,
-    isPlaying: false
+    isPlaying: false,
+    duration: 0
   }),
   
   actions: {
@@ -24,6 +25,10 @@ export const useVideoStore = defineStore('video', {
     
     setIsPlaying(isPlaying) {
       this.isPlaying = isPlaying
+    },
+    
+    setDuration(duration) {
+      this.duration = duration
     },
     
     async loadVideosFromFolder(folderPath) {
@@ -45,6 +50,27 @@ export const useVideoStore = defineStore('video', {
         this.videos = []
         return []
       }
+    },
+    
+    async loadVideoMetadata(videoPath) {
+      return new Promise((resolve, reject) => {
+        const tempVideo = document.createElement('video')
+        tempVideo.src = videoPath
+        tempVideo.crossOrigin = 'anonymous'
+        
+        tempVideo.addEventListener('loadedmetadata', () => {
+          this.duration = tempVideo.duration
+          resolve({
+            duration: tempVideo.duration,
+            videoElement: tempVideo
+          })
+        })
+        
+        tempVideo.addEventListener('error', (error) => {
+          console.error('Erreur lors du chargement de la vidéo:', error)
+          reject(error)
+        })
+      })
     }
   }
 }) 
