@@ -391,7 +391,7 @@ export default {
         (newTime) => {
           if (this.videoElement && newTime !== undefined) {
             // Seulement mettre à jour si la différence est significative
-            if (Math.abs(this.videoElement.currentTime - newTime) > 0.1) {
+            if (Math.abs(this.videoElement.currentTime - newTime) > 0.05) {
               this.videoElement.currentTime = newTime
             }
           }
