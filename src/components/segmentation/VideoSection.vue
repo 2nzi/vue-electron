@@ -52,132 +52,145 @@
 
     </div>
     <div class="video-container" ref="container">
-      <v-stage
-        ref="stage"
-        :config="stageConfig"
-        @mousedown="handleMouseDown"
-        @mousemove="handleMouseMove"
-        @mouseup="handleMouseUp"
-      >
-        <v-layer ref="layer">
-          <v-image
-            :config="{
-              image: videoElement,
-              width: imageWidth,
-              height: imageHeight,
-              x: position.x,
-              y: position.y,
-            }"
-          />
-          
-          <!-- Lignes de guidage -->
-          <v-line
-            v-if="mousePosition.x !== null && isInsideImage(mousePosition)"
-            :config="{
-              points: [
-                position.x, mousePosition.y,
-                position.x + imageWidth, mousePosition.y
-              ],
-              stroke: '#ffffff',
-              strokeWidth: 1,
-              dash: [5, 5],
-              opacity: 0.5
-            }"
-          />
-          <v-line
-            v-if="mousePosition.y !== null && isInsideImage(mousePosition)"
-            :config="{
-              points: [
-                mousePosition.x, position.y,
-                mousePosition.x, position.y + imageHeight
-              ],
-              stroke: '#ffffff',
-              strokeWidth: 1,
-              dash: [5, 5],
-              opacity: 0.5
-            }"
-          />
-          
-          <!-- Rectangle en cours de dessin -->
-          <v-rect
-            v-if="isDrawing && currentTool === 'rectangle'"
-            :config="{
-              x: rectangleStart.x,
-              y: rectangleStart.y,
-              width: rectangleSize.width,
-              height: rectangleSize.height,
-              stroke: '#4CAF50',
-              strokeWidth: 2,
-              dash: [5, 5],
-              fill: 'rgba(76, 175, 80, 0.2)'
-            }"
-          />
-          <!-- Rectangles sauvegardés -->
-          <v-rect
-            v-for="rect in rectangles"
-            :key="rect.id"
-            :config="{
-              x: rect.x,
-              y: rect.y,
-              width: rect.width,
-              height: rect.height,
-              stroke: '#4CAF50',
-              strokeWidth: 2,
-              fill: 'rgba(76, 175, 80, 0.2)'
-            }"
-          />
-          <!-- Poignées de redimensionnement pour le rectangle sélectionné -->
-          <template v-if="selectedId && currentTool === 'arrow'">
-            <v-circle
-              v-for="handle in getResizeHandles()"
-              :key="handle.position"
+      <div class="video-wrapper">
+        <video
+          ref="videoRef"
+          class="video-element"
+          crossorigin="anonymous"
+          muted
+        ></video>
+      </div>
+      
+      <div class="canvas-wrapper">
+        <v-stage
+          ref="stage"
+          :config="stageConfig"
+          @mousedown="handleMouseDown"
+          @mousemove="handleMouseMove"
+          @mouseup="handleMouseUp"
+          class="canvas-overlay"
+        >
+          <v-layer ref="layer">
+            <!-- Fond transparent explicite -->
+            <v-rect
               :config="{
-                x: handle.x,
-                y: handle.y,
-                radius: 4,
-                fill: 'white',
-                stroke: '#4CAF50',
+                x: position.x,
+                y: position.y,
+                width: imageWidth,
+                height: imageHeight,
+                fill: 'transparent'
+              }"
+            />
+            
+            <!-- Lignes de guidage -->
+            <v-line
+              v-if="mousePosition.x !== null && isInsideImage(mousePosition)"
+              :config="{
+                points: [
+                  position.x, mousePosition.y,
+                  position.x + imageWidth, mousePosition.y
+                ],
+                stroke: '#ffffff',
                 strokeWidth: 1,
-                draggable: true
-              }"
-              @dragmove="handleResize($event, handle.position)"
-            />
-          </template>
-          <!-- Points existants -->
-          <v-group
-            v-for="point in points"
-            :key="point.id"
-            :config="{
-              x: point.x,
-              y: point.y
-            }"
-          >
-            <v-circle
-              :config="{
-                radius: 5,
-                fill: point.color,
-                stroke: 'white',
-                strokeWidth: 1
+                dash: [5, 5],
+                opacity: 0.5
               }"
             />
             <v-line
+              v-if="mousePosition.y !== null && isInsideImage(mousePosition)"
               :config="{
-                points: [-2, 0, 2, 0],
-                stroke: 'white',
-                strokeWidth: 1
+                points: [
+                  mousePosition.x, position.y,
+                  mousePosition.x, position.y + imageHeight
+                ],
+                stroke: '#ffffff',
+                strokeWidth: 1,
+                dash: [5, 5],
+                opacity: 0.5
               }"
             />
-            <v-line
-              v-if="point.type === 'positive'"
+            
+            <!-- Rectangle en cours de dessin -->
+            <v-rect
+              v-if="isDrawing && currentTool === 'rectangle'"
               :config="{
-                points: [0, -2, 0, 2],
-                stroke: 'white',
-                strokeWidth: 1
+                x: rectangleStart.x,
+                y: rectangleStart.y,
+                width: rectangleSize.width,
+                height: rectangleSize.height,
+                stroke: '#4CAF50',
+                strokeWidth: 2,
+                dash: [5, 5],
+                fill: 'rgba(76, 175, 80, 0.2)'
               }"
             />
-          </v-group>
-        </v-layer>
-      </v-stage>
+            <!-- Rectangles sauvegardés -->
+            <v-rect
+              v-for="rect in rectangles"
+              :key="rect.id"
+              :config="{
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                stroke: '#4CAF50',
+                strokeWidth: 2,
+                fill: 'rgba(76, 175, 80, 0.2)'
+              }"
+            />
+            <!-- Poignées de redimensionnement pour le rectangle sélectionné -->
+            <template v-if="selectedId && currentTool === 'arrow'">
+              <v-circle
+                v-for="handle in getResizeHandles()"
+                :key="handle.position"
+                :config="{
+                  x: handle.x,
+                  y: handle.y,
+                  radius: 4,
+                  fill: 'white',
+                  stroke: '#4CAF50',
+                  strokeWidth: 1,
+                  draggable: true
+                }"
+                @dragmove="handleResize($event, handle.position)"
+              />
+            </template>
+            <!-- Points existants -->
+            <v-group
+              v-for="point in points"
+              :key="point.id"
+              :config="{
+                x: point.x,
+                y: point.y
+              }"
+            >
+              <v-circle
+                :config="{
+                  radius: 5,
+                  fill: point.color,
+                  stroke: 'white',
+                  strokeWidth: 1
+                }"
+              />
+              <v-line
+                :config="{
+                  points: [-2, 0, 2, 0],
+                  stroke: 'white',
+                  strokeWidth: 1
+                }"
+              />
+              <v-line
+                v-if="point.type === 'positive'"
+                :config="{
+                  points: [0, -2, 0, 2],
+                  stroke: 'white',
+                  strokeWidth: 1
+                }"
+              />
+            </v-group>
+          </v-layer>
+        </v-stage>
+      </div>
     </div>
 
     <div class="validation-tools">
@@ -257,27 +270,17 @@ export default {
   },
 
   mounted() {
-    // Créer l'élément vidéo
-    this.videoElement = document.createElement('video')
-    this.videoElement.crossOrigin = 'anonymous'
-    this.videoElement.muted = true // Important pour l'autoplay dans certains navigateurs
-    
-    // Écouter les événements de la vidéo
+    // Réactiver l'élément vidéo
+    this.videoElement = this.$refs.videoRef
+    this.videoElement.muted = true
     this.videoElement.addEventListener('loadedmetadata', this.handleVideoLoaded)
+    this.videoElement.addEventListener('timeupdate', this.updateCurrentFrame)
     
     // S'abonner aux changements de vidéo dans le store
     this.subscribeToVideoStore()
     
     window.addEventListener('resize', this.handleWindowResize)
     window.addEventListener('keydown', this.handleKeyDown)
-    
-    // Ajouter un écouteur d'événement pour la mise à jour de frame pendant la lecture
-    this.videoElement.addEventListener('timeupdate', this.updateCurrentFrame)
-    
-    // Mettre à jour la frame initiale
-    this.$nextTick(() => {
-      this.updateCurrentFrame()
-    })
   },
 
   beforeUnmount() {
@@ -417,6 +420,16 @@ export default {
       
       this.originalVideoPath = videoPath
       
+      // Si l'élément vidéo est commenté, ne pas essayer de charger la vidéo
+      if (!this.videoElement) {
+        console.log("Mode test: élément vidéo non disponible, simulation uniquement")
+        // Simuler des dimensions pour le test
+        this.imageWidth = 640
+        this.imageHeight = 360
+        this.updateDimensions()
+        return
+      }
+      
       // Vérifier si un proxy existe déjà ou en créer un
       this.createOrLoadProxy(videoPath)
         .then(proxyPath => {
@@ -508,14 +521,20 @@ export default {
     },
     
     playVideo() {
-      if (!this.videoElement) return
+      if (!this.videoElement) {
+        console.log("Mode test: élément vidéo non disponible")
+        return
+      }
       
       this.videoElement.play()
       this.startAnimation()
     },
     
     pauseVideo() {
-      if (!this.videoElement) return
+      if (!this.videoElement) {
+        console.log("Mode test: élément vidéo non disponible")
+        return
+      }
       
       this.videoElement.pause()
     },
@@ -566,12 +585,15 @@ export default {
 
     updateDimensions() {
       const container = this.$refs.container
-      if (!container || !this.videoElement) return
+      if (!container) return
 
       const containerWidth = container.clientWidth
       const containerHeight = container.clientHeight
 
-      const videoRatio = this.videoElement.videoWidth / this.videoElement.videoHeight
+      // Utiliser des dimensions fixes pour le test ou les dimensions de la vidéo si disponibles
+      const videoWidth = this.videoElement ? this.videoElement.videoWidth : this.imageWidth
+      const videoHeight = this.videoElement ? this.videoElement.videoHeight : this.imageHeight
+      const videoRatio = videoWidth / videoHeight
 
       let width = containerWidth
       let height = width / videoRatio
@@ -589,6 +611,12 @@ export default {
       this.position = {
         x: Math.floor((containerWidth - width) / 2),
         y: Math.floor((containerHeight - height) / 2)
+      }
+      
+      // Forcer une mise à jour du canvas
+      if (this.$refs.layer) {
+        const layer = this.$refs.layer.getNode();
+        layer.batchDraw();
       }
     },
 
@@ -724,8 +752,9 @@ export default {
         y: this.rectangleStart.y - this.position.y
       }
 
-      const imageOriginalWidth = this.videoElement.videoWidth
-      const imageOriginalHeight = this.videoElement.videoHeight
+      // Utiliser des dimensions fixes pour le test si videoElement n'est pas disponible
+      const imageOriginalWidth = this.videoElement ? this.videoElement.videoWidth : this.imageWidth
+      const imageOriginalHeight = this.videoElement ? this.videoElement.videoHeight : this.imageHeight
       const scaleX = imageOriginalWidth / this.imageWidth
       const scaleY = imageOriginalHeight / this.imageHeight
 
@@ -768,8 +797,9 @@ export default {
       const relativeY = pos.y - this.position.y
       
       const sourceElement = this.videoElement
-      const imageOriginalWidth = sourceElement.videoWidth
-      const imageOriginalHeight = sourceElement.videoHeight
+      // Utiliser des dimensions fixes pour le test si videoElement n'est pas disponible
+      const imageOriginalWidth = sourceElement ? sourceElement.videoWidth : this.imageWidth
+      const imageOriginalHeight = sourceElement ? sourceElement.videoHeight : this.imageHeight
       const scaleX = imageOriginalWidth / this.imageWidth
       const scaleY = imageOriginalHeight / this.imageHeight
       
@@ -954,12 +984,41 @@ export default {
   overflow: hidden;
 }
 
-.video-container > * {
+.video-wrapper, .canvas-wrapper {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+}
+
+.video-wrapper {
+  z-index: 1;
+}
+
+.canvas-wrapper {
+  z-index: 999;
+}
+
+.video-element {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  z-index: 1;
+}
+
+.canvas-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  background: transparent;
+  pointer-events: auto;
 }
 
 .tool-btn {
