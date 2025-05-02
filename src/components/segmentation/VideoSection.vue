@@ -836,6 +836,27 @@ export default {
         this.selectedId = null
         console.log('Element deleted')
       }
+      
+      // Ajouter la navigation frame par frame avec les flèches
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault() // Empêcher le défilement de la page
+        
+        // Calculer la nouvelle frame
+        const frameRate = this.annotationStore.currentSession.frameRate || 30
+        const currentFrame = this.currentFrameNumber
+        const newFrame = e.key === 'ArrowLeft' ? Math.max(0, currentFrame - 1) : currentFrame + 1
+        
+        // Calculer le nouveau temps basé sur la frame
+        const newTime = newFrame / frameRate
+        
+        // Mettre à jour le temps dans le store et la vidéo
+        this.videoStore.setCurrentTime(newTime)
+        if (this.videoElement) {
+          this.videoElement.currentTime = newTime
+        }
+        
+        console.log(`Navigation: Frame ${currentFrame} -> ${newFrame}, Temps: ${newTime.toFixed(3)}s`)
+      }
     },
 
     getResizeHandles() {
@@ -937,10 +958,22 @@ export default {
       const frameRate = this.annotationStore.currentSession.frameRate || 30
       
       // Utiliser Math.round au lieu de Math.floor pour une meilleure précision
-      this.currentFrameNumber = Math.round(this.videoElement.currentTime * frameRate)
+      const newFrameNumber = Math.round(this.videoElement.currentTime * frameRate)
       
-      // Log pour débogage
-      console.log(`Temps: ${this.videoElement.currentTime}s, Frame: ${this.currentFrameNumber}`)
+      // Ne mettre à jour que si la frame a changé
+      if (newFrameNumber !== this.currentFrameNumber) {
+        this.currentFrameNumber = newFrameNumber
+        
+        // Forcer le rafraîchissement du canvas pour s'assurer que seules les annotations
+        // de la frame actuelle sont affichées
+        if (this.$refs.layer) {
+          const layer = this.$refs.layer.getNode()
+          layer.batchDraw()
+        }
+        
+        // Log pour débogage
+        console.log(`Temps: ${this.videoElement.currentTime.toFixed(3)}s, Frame: ${this.currentFrameNumber}`)
+      }
     },
 
     selectObject(objectId) {
@@ -969,6 +1002,18 @@ export default {
     },
     'annotationStore.selectedObjectId'(newId) {
       console.log('Objet sélectionné changé:', newId)
+    },
+    currentFrameNumber(newFrame) {
+      // Forcer le rafraîchissement du canvas quand la frame change
+      this.$nextTick(() => {
+        if (this.$refs.layer) {
+          const layer = this.$refs.layer.getNode()
+          layer.batchDraw()
+        }
+        
+        // Utiliser newFrame pour éviter l'erreur "defined but never used"
+        console.log(`Frame actualisée: ${newFrame}`)
+      })
     }
   },
 }

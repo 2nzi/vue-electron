@@ -22,16 +22,7 @@
             <div class="marker-line"></div>
           </div>
           
-          <!-- Marqueurs d'annotation -->
-          <div 
-            v-for="(frame, frameNumber) in annotationFrames" 
-            :key="'annotation-' + frameNumber"
-            class="annotation-marker"
-            :style="{ left: getFramePosition(parseInt(frameNumber)) + '%' }"
-            @click="goToFrame(parseInt(frameNumber))"
-          >
-            <div class="annotation-dot" :style="{ backgroundColor: getAnnotationColor(frameNumber) }"></div>
-          </div>
+          <!-- Suppression des marqueurs d'annotation -->
           
           <div class="frames-container">
             <div 
