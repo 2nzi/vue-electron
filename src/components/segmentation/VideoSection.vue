@@ -268,6 +268,7 @@ export default {
       originalVideoPath: null,
       proxyVideoPath: null,
       isUsingProxy: true,
+      originalVideoDimensions: { width: 0, height: 0 },
     }
   },
 
@@ -362,10 +363,16 @@ export default {
         })
     },
     scaleX() {
+      if (this.originalVideoDimensions.width && this.imageWidth) {
+        return this.originalVideoDimensions.width / this.imageWidth
+      }
       if (!this.videoElement || !this.imageWidth) return 1
       return this.videoElement.videoWidth / this.imageWidth
     },
     scaleY() {
+      if (this.originalVideoDimensions.height && this.imageHeight) {
+        return this.originalVideoDimensions.height / this.imageHeight
+      }
       if (!this.videoElement || !this.imageHeight) return 1
       return this.videoElement.videoHeight / this.imageHeight
     }
@@ -432,22 +439,70 @@ export default {
         return
       }
       
-      // Vérifier si un proxy existe déjà ou en créer un
-      this.createOrLoadProxy(videoPath)
-        .then(proxyPath => {
-          this.proxyVideoPath = proxyPath
+      // Obtenir les dimensions de la vidéo originale avant de créer le proxy
+      this.getOriginalVideoDimensions(videoPath)
+        .then(dimensions => {
+          console.log("Dimensions de la vidéo originale:", dimensions.width, "x", dimensions.height)
+          // Stocker les dimensions originales pour les utiliser dans les calculs de coordonnées
+          this.originalVideoDimensions = dimensions
           
-          // Charger le proxy si l'option est activée, sinon charger l'original
-          const sourceToLoad = this.isUsingProxy ? proxyPath : videoPath
-          this.videoElement.src = sourceToLoad
-          this.videoElement.load()
+          // Vérifier si un proxy existe déjà ou en créer un
+          this.createOrLoadProxy(videoPath)
+            .then(proxyPath => {
+              this.proxyVideoPath = proxyPath
+              
+              // Charger le proxy si l'option est activée, sinon charger l'original
+              const sourceToLoad = this.isUsingProxy ? proxyPath : videoPath
+              this.videoElement.src = sourceToLoad
+              this.videoElement.load()
+            })
+            .catch(err => {
+              console.error("Erreur lors de la création du proxy:", err)
+              // En cas d'erreur, charger la vidéo originale
+              this.videoElement.src = videoPath
+              this.videoElement.load()
+            })
         })
         .catch(err => {
-          console.error("Erreur lors de la création du proxy:", err)
-          // En cas d'erreur, charger la vidéo originale
+          console.error("Erreur lors de l'obtention des dimensions de la vidéo originale:", err)
+          // Continuer avec le chargement normal
           this.videoElement.src = videoPath
           this.videoElement.load()
         })
+    },
+    
+    async getOriginalVideoDimensions(videoPath) {
+      return new Promise((resolve, reject) => {
+        // Créer un élément vidéo temporaire pour obtenir les dimensions
+        const tempVideo = document.createElement('video')
+        tempVideo.style.display = 'none'
+        
+        // Configurer les gestionnaires d'événements
+        tempVideo.onloadedmetadata = () => {
+          const dimensions = {
+            width: tempVideo.videoWidth,
+            height: tempVideo.videoHeight
+          }
+          
+          // Nettoyer
+          document.body.removeChild(tempVideo)
+          
+          resolve(dimensions)
+        }
+        
+        tempVideo.onerror = (error) => {
+          // Nettoyer
+          if (document.body.contains(tempVideo)) {
+            document.body.removeChild(tempVideo)
+          }
+          
+          reject(error)
+        }
+        
+        // Ajouter l'élément au DOM et charger la vidéo
+        document.body.appendChild(tempVideo)
+        tempVideo.src = videoPath
+      })
     },
     
     async createOrLoadProxy(originalPath) {
@@ -516,6 +571,12 @@ export default {
     
     handleVideoLoaded() {
       console.log('Vidéo chargée, dimensions:', this.videoElement.videoWidth, 'x', this.videoElement.videoHeight)
+      
+      // Ajouter un log pour indiquer si c'est le proxy ou l'original
+      const sourceType = this.isUsingProxy ? "proxy" : "originale"
+      console.log(`Vidéo ${sourceType} chargée. Dimensions d'affichage:`, 
+                  this.videoElement.videoWidth, 'x', this.videoElement.videoHeight)
+      
       this.initializeView()
       
       // Démarrer l'animation pour le rendu fluide
@@ -730,6 +791,39 @@ export default {
 
       if (this.isDragging) {
         this.isDragging = false
+        
+        // Mettre à jour la position dans le store après le drag
+        if (this.selectedId) {
+          const selectedRect = this.rectangles.find(r => r.id === this.selectedId)
+          if (selectedRect) {
+            // Convertir les coordonnées d'affichage en coordonnées réelles
+            const realX = Math.round((selectedRect.x - this.position.x) * this.scaleX)
+            const realY = Math.round((selectedRect.y - this.position.y) * this.scaleY)
+            const realWidth = Math.round(selectedRect.width * this.scaleX)
+            const realHeight = Math.round(selectedRect.height * this.scaleY)
+            
+            // Mettre à jour l'annotation dans le store
+            this.annotationStore.updateAnnotation(this.currentFrameNumber, this.selectedId, {
+              x: realX,
+              y: realY,
+              width: realWidth,
+              height: realHeight
+            })
+          }
+          
+          const selectedPoint = this.points.find(p => p.id === this.selectedId)
+          if (selectedPoint) {
+            // Convertir les coordonnées d'affichage en coordonnées réelles
+            const realX = Math.round((selectedPoint.x - this.position.x) * this.scaleX)
+            const realY = Math.round((selectedPoint.y - this.position.y) * this.scaleY)
+            
+            // Mettre à jour l'annotation dans le store
+            this.annotationStore.updateAnnotation(this.currentFrameNumber, this.selectedId, {
+              x: realX,
+              y: realY
+            })
+          }
+        }
         return
       }
 
@@ -740,20 +834,15 @@ export default {
         y: this.rectangleStart.y - this.position.y
       }
 
-      // Utiliser des dimensions fixes pour le test si videoElement n'est pas disponible
-      const imageOriginalWidth = this.videoElement ? this.videoElement.videoWidth : this.imageWidth
-      const imageOriginalHeight = this.videoElement ? this.videoElement.videoHeight : this.imageHeight
-      const scaleX = imageOriginalWidth / this.imageWidth
-      const scaleY = imageOriginalHeight / this.imageHeight
-
+      // Utiliser les dimensions réelles de la vidéo originale, pas du proxy
       const originalRect = {
-        x: Math.round(relativeStart.x * scaleX),
-        y: Math.round(relativeStart.y * scaleY),
-        width: Math.round(this.rectangleSize.width * scaleX),
-        height: Math.round(this.rectangleSize.height * scaleY)
+        x: Math.round(relativeStart.x * this.scaleX),
+        y: Math.round(relativeStart.y * this.scaleY),
+        width: Math.round(this.rectangleSize.width * this.scaleX),
+        height: Math.round(this.rectangleSize.height * this.scaleY)
       }
 
-      // Créer l'annotation
+      // Créer l'annotation avec les coordonnées réelles
       const annotation = {
         objectId: this.annotationStore.selectedObjectId,
         type: 'rectangle',
@@ -769,7 +858,6 @@ export default {
       // Log détaillé
       console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
       console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
-      console.log('Objets disponibles:', JSON.parse(JSON.stringify(this.annotationStore.objects)))
 
       this.isDrawing = false
       this.rectangleSize = { width: 0, height: 0 }
@@ -790,17 +878,11 @@ export default {
       const relativeX = pos.x - this.position.x
       const relativeY = pos.y - this.position.y
       
-      const sourceElement = this.videoElement
-      // Utiliser des dimensions fixes pour le test si videoElement n'est pas disponible
-      const imageOriginalWidth = sourceElement ? sourceElement.videoWidth : this.imageWidth
-      const imageOriginalHeight = sourceElement ? sourceElement.videoHeight : this.imageHeight
-      const scaleX = imageOriginalWidth / this.imageWidth
-      const scaleY = imageOriginalHeight / this.imageHeight
+      // Utiliser les dimensions réelles de la vidéo originale, pas du proxy
+      const imageX = Math.round(relativeX * this.scaleX)
+      const imageY = Math.round(relativeY * this.scaleY)
       
-      const imageX = Math.round(relativeX * scaleX)
-      const imageY = Math.round(relativeY * scaleY)
-      
-      // Créer l'annotation
+      // Créer l'annotation avec les coordonnées réelles
       const annotation = {
         objectId: this.annotationStore.selectedObjectId,
         type: 'point',
@@ -815,7 +897,6 @@ export default {
       // Log détaillé
       console.log('Point ajouté à la frame', this.currentFrameNumber, ':', annotation)
       console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
-      console.log('Objets disponibles:', JSON.parse(JSON.stringify(this.annotationStore.objects)))
     },
 
     handleKeyDown(e) {
@@ -877,6 +958,7 @@ export default {
       const originalHeight = rect.height
       let newWidth, newHeight
 
+      // Appliquer le redimensionnement selon la poignée utilisée
       switch (position) {
         case 'e':
           rect.width = Math.max(10, pos.x - rect.x)
@@ -927,6 +1009,20 @@ export default {
           rect.height = Math.max(10, pos.y - rect.y)
           break
       }
+      
+      // Convertir les coordonnées d'affichage en coordonnées réelles
+      const realX = Math.round((rect.x - this.position.x) * this.scaleX)
+      const realY = Math.round((rect.y - this.position.y) * this.scaleY)
+      const realWidth = Math.round(rect.width * this.scaleX)
+      const realHeight = Math.round(rect.height * this.scaleY)
+      
+      // Mettre à jour l'annotation dans le store avec les coordonnées réelles
+      this.annotationStore.updateAnnotation(this.currentFrameNumber, this.selectedId, {
+        x: realX,
+        y: realY,
+        width: realWidth,
+        height: realHeight
+      })
     },
 
     validatePoints() {

@@ -84,7 +84,7 @@ export default {
 
 .timeline-container {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex: 1;
   min-height: 0; /* Crucial pour que le scroll fonctionne dans un conteneur flex */
   overflow: hidden; /* Contenir les enfants */

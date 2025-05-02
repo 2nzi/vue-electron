@@ -142,7 +142,7 @@ export default {
   height: 24px;
   margin-bottom: 18px;
   align-items: center;
-  gap: 4px;
+  gap: 14px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   border-radius: 4px;
