@@ -1,5 +1,6 @@
 // Dans un store Pinia (stores/annotationStore.js)
 import { defineStore } from 'pinia'
+import { v4 as uuidv4 } from 'uuid'
 
 export const useAnnotationStore = defineStore('annotations', {
   state: () => ({
@@ -20,9 +21,7 @@ export const useAnnotationStore = defineStore('annotations', {
     objectIdCounter: 1,
     
     // Annotations par frame
-    frameAnnotations: {
-      // Exemple: "15": [{ objectId: "object-1", type: "rectangle", x: 100, y: 100, width: 200, height: 150 }]
-    },
+    frameAnnotations: {}, // { frameNumber: [{ id, objectId, type, x, y, width, height, mask, maskScore, maskImageSize }] }
     selectedObjectId: null
   }),
   
@@ -40,14 +39,33 @@ export const useAnnotationStore = defineStore('annotations', {
     
     // Ajouter une annotation pour l'objet sélectionné à la frame actuelle
     addAnnotation(frameNumber, annotation) {
-      // S'assurer que le tableau d'annotations pour cette frame existe
+      const id = uuidv4()
+      const newAnnotation = { id, ...annotation }
+      
       if (!this.frameAnnotations[frameNumber]) {
         this.frameAnnotations[frameNumber] = []
       }
       
-      // Ajouter l'annotation au tableau
-      this.frameAnnotations[frameNumber].push(annotation)
-      console.log(`Annotation ajoutée pour l'objet ${annotation.objectId} à la frame ${frameNumber}`)
+      this.frameAnnotations[frameNumber].push(newAnnotation)
+      
+      // Retourner l'ID pour pouvoir mettre à jour l'annotation plus tard
+      return id
+    },
+    
+    updateAnnotation(frameNumber, annotationId, updates) {
+      if (!this.frameAnnotations[frameNumber]) return
+      
+      const annotationIndex = this.frameAnnotations[frameNumber].findIndex(
+        a => a.id === annotationId
+      )
+      
+      if (annotationIndex === -1) return
+      
+      // Mettre à jour l'annotation avec les nouvelles propriétés
+      this.frameAnnotations[frameNumber][annotationIndex] = {
+        ...this.frameAnnotations[frameNumber][annotationIndex],
+        ...updates
+      }
     },
     
     // Ajouter un nouvel objet
@@ -107,6 +125,12 @@ export const useAnnotationStore = defineStore('annotations', {
         this.objectIdCounter = data.objectIdCounter || 1
         this.frameAnnotations = data.frameAnnotations
       }
+    },
+    
+    getAnnotation(frameNumber, annotationId) {
+      if (!this.frameAnnotations[frameNumber]) return null
+      
+      return this.frameAnnotations[frameNumber].find(a => a.id === annotationId) || null
     }
   }
 })

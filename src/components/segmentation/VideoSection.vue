@@ -118,10 +118,10 @@
                 y: rectangleStart.y,
                 width: rectangleSize.width,
                 height: rectangleSize.height,
-                stroke: '#4CAF50',
-                strokeWidth: 2,
-                dash: [5, 5],
-                fill: 'rgba(76, 175, 80, 0.2)'
+                stroke: getObjectColor(annotationStore.selectedObjectId),
+                strokeWidth: 1,
+                fill: null,
+                dash: []
               }"
             />
             <!-- Rectangles sauvegardés -->
@@ -134,10 +134,13 @@
                 width: rect.width,
                 height: rect.height,
                 stroke: rect.color,
-                strokeWidth: rect.objectId === annotationStore.selectedObjectId ? 3 : 2,
-                fill: rect.objectId === annotationStore.selectedObjectId ? `${rect.color}33` : `${rect.color}22`,
+                strokeWidth: rect.objectId === annotationStore.selectedObjectId ? 2 : 1,
+                fill: null,
+                dash: rect.type === 'proxy' ? [5, 5] : [],
+                id: rect.id,
                 objectId: rect.objectId
               }"
+              @mousedown="handleShapeMouseDown($event, rect.id)"
             />
             <!-- Poignées de redimensionnement pour le rectangle sélectionné -->
             <template v-if="selectedId && currentTool === 'arrow'">
@@ -190,6 +193,24 @@
                 }"
               />
             </v-group>
+            
+            <!-- Masques de segmentation -->
+            <v-shape
+              v-for="annotation in maskedAnnotations"
+              :key="`mask-${annotation.id}`"
+              :config="{
+                sceneFunc: (context, shape) => drawMask(context, shape, annotation),
+                fill: annotation.objectId === annotationStore.selectedObjectId ? 
+                  `${getObjectColor(annotation.objectId)}88` : 
+                  `${getObjectColor(annotation.objectId)}44`,
+                stroke: getObjectColor(annotation.objectId),
+                strokeWidth: annotation.objectId === annotationStore.selectedObjectId ? 2 : 1,
+                opacity: 0.8,
+                listening: true,
+                id: annotation.id
+              }"
+              @mousedown="handleMaskClick(annotation.id)"
+            />
           </v-layer>
         </v-stage>
       </div>
@@ -219,12 +240,19 @@
         </svg>
       </button>
     </div>
+
+    <!-- Indicateur de chargement de segmentation -->
+    <div v-if="isProcessingSegmentation" class="segmentation-loading">
+      <div class="spinner"></div>
+      <span>Segmentation en cours...</span>
+    </div>
   </div>
 </template>
 
 <script>
 import { useVideoStore } from '@/stores/videoStore'
 import { useAnnotationStore } from '@/stores/annotationStore'
+import axios from 'axios'
 
 export default {
   name: 'VideoSection',
@@ -269,6 +297,9 @@ export default {
       proxyVideoPath: null,
       isUsingProxy: true,
       originalVideoDimensions: { width: 0, height: 0 },
+      apiBaseUrl: 'http://localhost:8000',
+      isProcessingSegmentation: false,
+      maskCache: {},
     }
   },
 
@@ -375,7 +406,11 @@ export default {
       }
       if (!this.videoElement || !this.imageHeight) return 1
       return this.videoElement.videoHeight / this.imageHeight
-    }
+    },
+    maskedAnnotations() {
+      const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || [];
+      return frameAnnotations.filter(annotation => annotation.mask && annotation.maskImageSize);
+    },
   },
 
   methods: {
@@ -783,7 +818,7 @@ export default {
       }
     },
 
-    handleMouseUp() {
+    async handleMouseUp() {
       if (this.resizing) {
         this.resizing = false
         return
@@ -853,7 +888,10 @@ export default {
       }
 
       // Ajouter l'annotation au store
-      this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+      const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+
+      // Appeler l'API pour obtenir le masque de segmentation
+      await this.getSegmentationMask(annotationId, originalRect)
 
       // Log détaillé
       console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
@@ -861,6 +899,89 @@ export default {
 
       this.isDrawing = false
       this.rectangleSize = { width: 0, height: 0 }
+    },
+
+    async getSegmentationMask(annotationId, bbox) {
+      try {
+        this.isProcessingSegmentation = true
+        
+        // Capturer l'image actuelle de la vidéo
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Utiliser les dimensions réelles de la vidéo
+        canvas.width = this.originalVideoDimensions.width
+        canvas.height = this.originalVideoDimensions.height
+        
+        // Dessiner l'image actuelle sur le canvas
+        ctx.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height)
+        
+        // Convertir le canvas en blob
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.95)
+        })
+        
+        // Créer un FormData pour l'envoi
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+        formData.append('bbox', JSON.stringify(bbox))
+        
+        console.log('Envoi de la requête de segmentation avec bbox:', bbox)
+        
+        // Appeler l'API
+        const response = await axios.post(`${this.apiBaseUrl}/segment/bbox`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        console.log('Réponse de segmentation reçue:', response.data)
+        
+        // Stocker le masque dans l'annotation
+        if (response.data && response.data.masks && response.data.masks.length > 0) {
+          // Prendre le masque avec le meilleur score
+          const bestMaskIndex = response.data.scores.indexOf(Math.max(...response.data.scores))
+          const bestMask = response.data.masks[bestMaskIndex]
+          const bestScore = response.data.scores[bestMaskIndex]
+          
+          // Mettre à jour l'annotation avec le masque
+          this.annotationStore.updateAnnotation(this.currentFrameNumber, annotationId, {
+            mask: bestMask,
+            maskScore: bestScore,
+            maskImageSize: response.data.image_size
+          })
+          
+          // Log détaillé du masque
+          console.log(`Masque ajouté à l'annotation ${annotationId} avec un score de ${bestScore}`)
+          console.log('Détails du masque:')
+          console.log('- Format:', typeof bestMask === 'string' ? 'RLE (chaîne)' : 'Autre format')
+          console.log('- Taille de la chaîne RLE:', bestMask.length)
+          console.log('- Début du masque:', bestMask.substring(0, 100) + '...')
+          console.log('- Dimensions de l\'image:', response.data.image_size)
+          
+          // Récupérer l'annotation complète pour vérifier
+          const updatedAnnotation = this.annotationStore.getAnnotation(this.currentFrameNumber, annotationId)
+          console.log('Annotation mise à jour avec masque:', updatedAnnotation)
+          
+          return {
+            success: true,
+            maskScore: bestScore
+          }
+        } else {
+          console.warn('Aucun masque n\'a été retourné par l\'API')
+          return {
+            success: false
+          }
+        }
+      } catch (error) {
+        console.error('Erreur lors de la segmentation:', error)
+        return {
+          success: false,
+          error: error.message
+        }
+      } finally {
+        this.isProcessingSegmentation = false
+      }
     },
 
     isInsideImage(point) {
@@ -1096,6 +1217,149 @@ export default {
       // Continuer l'animation
       this.animationId = requestAnimationFrame(this.animate);
     },
+
+    getObjectColor(objectId) {
+      const object = this.annotationStore.objects[objectId];
+      return object ? object.color : '#CCCCCC';
+    },
+    
+    handleMaskClick(id) {
+      this.selectedId = id;
+      
+      // Trouver l'annotation correspondante
+      const annotation = this.annotationStore.getAnnotation(this.currentFrameNumber, id);
+      
+      if (annotation) {
+        // Sélectionner l'objet correspondant
+        this.annotationStore.selectObject(annotation.objectId);
+      }
+    },
+    
+    drawMask(context, shape, annotation) {
+      if (!annotation.mask || !annotation.maskImageSize) {
+        console.warn('Annotation sans masque ou dimensions:', annotation);
+        return;
+      }
+      
+      // Vérifier si le masque est déjà dans le cache
+      const cacheKey = `${annotation.id}-${annotation.mask.substring(0, 20)}`;
+      let maskImage = this.maskCache[cacheKey];
+      
+      if (!maskImage) {
+        try {
+          console.log(`Décodage du masque pour l'annotation ${annotation.id}`);
+          console.log('Début du masque:', annotation.mask.substring(0, 50) + '...');
+          
+          // Créer une nouvelle image pour charger le masque base64
+          maskImage = new Image();
+          
+          // Attendre que l'image soit chargée avant de continuer
+          const loadPromise = new Promise((resolve, reject) => {
+            maskImage.onload = () => resolve();
+            maskImage.onerror = (e) => reject(new Error(`Erreur de chargement de l'image: ${e}`));
+          });
+          
+          // Définir la source de l'image (base64)
+          if (annotation.mask.startsWith('data:')) {
+            // Si c'est déjà un data URL
+            maskImage.src = annotation.mask;
+          } else {
+            // Sinon, supposer que c'est un base64 brut et créer un data URL
+            maskImage.src = `data:image/png;base64,${annotation.mask}`;
+          }
+          
+          // Attendre que l'image soit chargée
+          loadPromise.then(() => {
+            console.log(`Image du masque chargée: ${maskImage.width}x${maskImage.height}`);
+            
+            // Créer un canvas temporaire pour traiter l'image
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = maskImage.width;
+            tempCanvas.height = maskImage.height;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            // Dessiner l'image sur le canvas temporaire
+            tempCtx.drawImage(maskImage, 0, 0);
+            
+            // Obtenir les données de l'image
+            const imageData = tempCtx.getImageData(0, 0, maskImage.width, maskImage.height);
+            const data = imageData.data;
+            
+            // Obtenir la couleur de l'objet
+            const objectColor = this.getObjectColor(annotation.objectId);
+            const r = parseInt(objectColor.slice(1, 3), 16);
+            const g = parseInt(objectColor.slice(3, 5), 16);
+            const b = parseInt(objectColor.slice(5, 7), 16);
+            
+            // Parcourir tous les pixels
+            for (let i = 0; i < data.length; i += 4) {
+              // Si le pixel est blanc (ou presque blanc)
+              if (data[i] > 200 && data[i+1] > 200 && data[i+2] > 200) {
+                // Remplacer par la couleur de l'objet avec une transparence
+                data[i] = r;
+                data[i+1] = g;
+                data[i+2] = b;
+                data[i+3] = 180; // Semi-transparent
+              } else {
+                // Rendre le pixel complètement transparent
+                data[i+3] = 0;
+              }
+            }
+            
+            // Remettre les données modifiées dans le canvas
+            tempCtx.putImageData(imageData, 0, 0);
+            
+            // Créer une nouvelle image à partir du canvas modifié
+            const coloredMaskImage = new Image();
+            coloredMaskImage.src = tempCanvas.toDataURL();
+            
+            // Mettre en cache l'image colorée
+            this.maskCache[cacheKey] = coloredMaskImage;
+            
+            // Forcer un nouveau rendu
+            this.$nextTick(() => {
+              if (this.$refs.layer) {
+                this.$refs.layer.getNode().batchDraw();
+              }
+            });
+          }).catch(error => {
+            console.error('Erreur lors du traitement de l\'image du masque:', error);
+          });
+          
+          // Retourner tôt car l'image n'est pas encore chargée
+          return;
+        } catch (error) {
+          console.error('Erreur lors de la création de l\'image du masque:', error);
+          return;
+        }
+      }
+      
+      // Si l'image n'est pas encore complètement chargée, retourner
+      if (!maskImage.complete) {
+        return;
+      }
+      
+      // Calculer l'échelle pour adapter le masque à la taille d'affichage
+      const scaleX = this.imageWidth / annotation.maskImageSize.width;
+      const scaleY = this.imageHeight / annotation.maskImageSize.height;
+      
+      // Dessiner le masque sur le canvas principal
+      const ctx = context._context;
+      ctx.save();
+      
+      // Appliquer la transformation pour positionner correctement le masque
+      ctx.translate(this.position.x, this.position.y);
+      ctx.scale(scaleX, scaleY);
+      
+      // Dessiner l'image du masque coloré
+      ctx.drawImage(maskImage, 0, 0);
+      
+      // Restaurer le contexte
+      ctx.restore();
+      
+      // Indiquer à Konva que le dessin est terminé
+      shape.strokeEnabled(false); // Désactiver le contour automatique
+    },
   },
 
   watch: {
@@ -1262,5 +1526,32 @@ export default {
 
 .pulse-animation {
   animation: pulse 1.5s infinite ease-in-out;
+}
+
+.segmentation-loading {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 10px 15px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style> 
