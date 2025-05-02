@@ -133,9 +133,10 @@
                 y: rect.y,
                 width: rect.width,
                 height: rect.height,
-                stroke: '#4CAF50',
-                strokeWidth: 2,
-                fill: 'rgba(76, 175, 80, 0.2)'
+                stroke: rect.color,
+                strokeWidth: rect.objectId === annotationStore.selectedObjectId ? 3 : 2,
+                fill: rect.objectId === annotationStore.selectedObjectId ? `${rect.color}33` : `${rect.color}22`,
+                objectId: rect.objectId
               }"
             />
             <!-- Poignées de redimensionnement pour le rectangle sélectionné -->
@@ -161,15 +162,16 @@
               :key="point.id"
               :config="{
                 x: point.x,
-                y: point.y
+                y: point.y,
+                objectId: point.objectId
               }"
             >
               <v-circle
                 :config="{
-                  radius: 5,
+                  radius: point.objectId === annotationStore.selectedObjectId ? 6 : 5,
                   fill: point.color,
                   stroke: 'white',
-                  strokeWidth: 1
+                  strokeWidth: point.objectId === annotationStore.selectedObjectId ? 2 : 1
                 }"
               />
               <v-line
@@ -543,22 +545,8 @@ export default {
       // Arrêter l'animation existante si elle existe
       this.stopAnimation()
       
-      // Utiliser l'API de vue-konva pour accéder à l'animation
-      const layer = this.$refs.layer.getNode()
-      
-      // Créer une fonction d'animation qui sera appelée à chaque frame
-      const animate = () => {
-        // Forcer le rafraîchissement du layer
-        layer.batchDraw()
-        
-        // Continuer l'animation si on est toujours en lecture
-        if (this.videoStore?.isPlaying) {
-          this.animationId = requestAnimationFrame(animate)
-        }
-      }
-      
       // Démarrer l'animation
-      this.animationId = requestAnimationFrame(animate)
+      this.animationId = requestAnimationFrame(this.animate)
     },
     
     stopAnimation() {
@@ -855,7 +843,7 @@ export default {
           this.videoElement.currentTime = newTime
         }
         
-        console.log(`Navigation: Frame ${currentFrame} -> ${newFrame}, Temps: ${newTime.toFixed(3)}s`)
+        // console.log(`Navigation: Frame ${currentFrame} -> ${newFrame}, Temps: ${newTime.toFixed(3)}s`)
       }
     },
 
@@ -972,7 +960,7 @@ export default {
         }
         
         // Log pour débogage
-        console.log(`Temps: ${this.videoElement.currentTime.toFixed(3)}s, Frame: ${this.currentFrameNumber}`)
+        // console.log(`Temps: ${this.videoElement.currentTime.toFixed(3)}s, Frame: ${this.currentFrameNumber}`)
       }
     },
 
@@ -983,7 +971,35 @@ export default {
 
     createNewObject() {
       this.annotationStore.addObject()
-    }
+    },
+
+    animate() {
+      // Récupérer les éléments sélectionnés
+      if (this.$refs.layer && this.annotationStore.selectedObjectId) {
+        const layer = this.$refs.layer.getNode();
+        
+        // Trouver tous les éléments de l'objet sélectionné
+        const selectedRects = layer.find('Rect').filter(rect => {
+          return rect.attrs.objectId === this.annotationStore.selectedObjectId;
+        });
+        
+        const selectedPoints = layer.find('Group').filter(group => {
+          return group.attrs.objectId === this.annotationStore.selectedObjectId;
+        });
+        
+        // Appliquer l'animation
+        [...selectedRects, ...selectedPoints].forEach(shape => {
+          // Animation de pulsation
+          const scale = 1 + Math.sin(Date.now() / 300) * 0.05; // Pulsation subtile
+          shape.scale({ x: scale, y: scale });
+        });
+        
+        layer.batchDraw();
+      }
+      
+      // Continuer l'animation
+      this.animationId = requestAnimationFrame(this.animate);
+    },
   },
 
   watch: {
@@ -1002,17 +1018,16 @@ export default {
     },
     'annotationStore.selectedObjectId'(newId) {
       console.log('Objet sélectionné changé:', newId)
+      // Redémarrer l'animation quand l'objet sélectionné change
+      this.startAnimation()
     },
-    currentFrameNumber(newFrame) {
+    currentFrameNumber() {
       // Forcer le rafraîchissement du canvas quand la frame change
       this.$nextTick(() => {
         if (this.$refs.layer) {
           const layer = this.$refs.layer.getNode()
           layer.batchDraw()
         }
-        
-        // Utiliser newFrame pour éviter l'erreur "defined but never used"
-        console.log(`Frame actualisée: ${newFrame}`)
       })
     }
   },
@@ -1132,5 +1147,24 @@ export default {
 
 .tool-btn:not(:disabled):hover {
   background: #4a4a4a;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.pulse-animation {
+  animation: pulse 1.5s infinite ease-in-out;
 }
 </style> 

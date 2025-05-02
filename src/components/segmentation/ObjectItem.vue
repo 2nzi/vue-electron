@@ -103,7 +103,7 @@ export default {
       // Ajouter un petit décalage (0.001) pour éviter les problèmes d'arrondi
       const timeInSeconds = frameNumber / frameRate + 0.001
       
-      console.log(`Navigation vers frame ${frameNumber}, temps: ${timeInSeconds}s`)
+      // console.log(`Navigation vers frame ${frameNumber}, temps: ${timeInSeconds}s`)
       
       // Mettre à jour le temps courant dans le videoStore
       videoStore.setCurrentTime(timeInSeconds)
