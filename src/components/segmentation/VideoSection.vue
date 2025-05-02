@@ -765,17 +765,23 @@ export default {
         height: Math.round(this.rectangleSize.height * scaleY)
       }
 
-      // Ajouter l'annotation au store
-      this.annotationStore.addAnnotation(this.currentFrameNumber, {
+      // Créer l'annotation
+      const annotation = {
         objectId: this.annotationStore.selectedObjectId,
         type: 'rectangle',
         x: originalRect.x,
         y: originalRect.y,
         width: originalRect.width,
         height: originalRect.height
-      })
+      }
 
-      console.log('Rectangle ajouté:', originalRect)
+      // Ajouter l'annotation au store
+      this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+
+      // Log détaillé
+      console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
+      console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+      console.log('Objets disponibles:', JSON.parse(JSON.stringify(this.annotationStore.objects)))
 
       this.isDrawing = false
       this.rectangleSize = { width: 0, height: 0 }
@@ -806,15 +812,22 @@ export default {
       const imageX = Math.round(relativeX * scaleX)
       const imageY = Math.round(relativeY * scaleY)
       
-      this.annotationStore.addAnnotation(this.currentFrameNumber, {
+      // Créer l'annotation
+      const annotation = {
         objectId: this.annotationStore.selectedObjectId,
         type: 'point',
         x: imageX,
         y: imageY,
         pointType: type
-      })
+      }
       
-      console.log('Point ajouté:', { x: imageX, y: imageY, type: type })
+      // Ajouter l'annotation au store
+      this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+      
+      // Log détaillé
+      console.log('Point ajouté à la frame', this.currentFrameNumber, ':', annotation)
+      console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+      console.log('Objets disponibles:', JSON.parse(JSON.stringify(this.annotationStore.objects)))
     },
 
     handleKeyDown(e) {
@@ -922,7 +935,12 @@ export default {
       if (!this.videoElement) return
       
       const frameRate = this.annotationStore.currentSession.frameRate || 30
-      this.currentFrameNumber = Math.floor(this.videoElement.currentTime * frameRate)
+      
+      // Utiliser Math.round au lieu de Math.floor pour une meilleure précision
+      this.currentFrameNumber = Math.round(this.videoElement.currentTime * frameRate)
+      
+      // Log pour débogage
+      console.log(`Temps: ${this.videoElement.currentTime}s, Frame: ${this.currentFrameNumber}`)
     },
 
     selectObject(objectId) {

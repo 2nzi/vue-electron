@@ -19,6 +19,7 @@
           backgroundColor: getObjectColor
         }"
         :title="`Frame ${frameKey}`"
+        @click.stop="goToFrame(parseInt(frameKey))"
       ></div>
     </div>
   </div>
@@ -93,13 +94,43 @@ export default {
       return (timeInSeconds / videoDuration) * 100
     }
     
+    // Fonction pour naviguer vers une frame spécifique
+    const goToFrame = (frameNumber) => {
+      // Convertir le numéro de frame en temps (secondes)
+      const frameRate = annotationStore.currentSession.frameRate || 30
+      
+      // Utiliser une valeur exacte pour le temps en secondes
+      // Ajouter un petit décalage (0.001) pour éviter les problèmes d'arrondi
+      const timeInSeconds = frameNumber / frameRate + 0.001
+      
+      console.log(`Navigation vers frame ${frameNumber}, temps: ${timeInSeconds}s`)
+      
+      // Mettre à jour le temps courant dans le videoStore
+      videoStore.setCurrentTime(timeInSeconds)
+      
+      // Utiliser la méthode seek si disponible
+      if (videoStore.seek) {
+        videoStore.seek(timeInSeconds)
+      } else {
+        // Fallback: essayer d'accéder directement à l'élément vidéo
+        const videoElement = document.querySelector('video')
+        if (videoElement) {
+          videoElement.currentTime = timeInSeconds
+        }
+      }
+      
+      // Forcer la mise à jour de l'interface
+      videoStore.updateProgressBar(timeInSeconds)
+    }
+    
     return {
       annotatedFrames,
       calculatePositionExact,
       getObjectColor,
       timelineRef,
       isSelected,
-      toggleSelection
+      toggleSelection,
+      goToFrame
     }
   }
 }

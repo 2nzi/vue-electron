@@ -71,6 +71,15 @@ export const useVideoStore = defineStore('video', {
           reject(error)
         })
       })
+    },
+    
+    updateProgressBar(time) {
+      this.currentTime = time
+      this.emitTimeUpdate(time)
+    },
+    
+    emitTimeUpdate(time) {
+      this.currentTime = time
     }
   }
 }) 
