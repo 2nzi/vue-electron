@@ -1146,14 +1146,118 @@ export default {
       })
     },
 
-    validatePoints() {
-      this.$emit('points-validated', this.points)
-      this.points = []
-      this.currentTool = 'arrow'
+    async validatePoints() {
+      if (this.points.length === 0) {
+        console.warn('Aucun point à valider')
+        return
+      }
+
+      try {
+        this.isProcessingSegmentation = true
+        
+        // Récupérer tous les points pour l'objet sélectionné
+        const objectPoints = this.points.filter(p => p.objectId === this.annotationStore.selectedObjectId)
+        
+        if (objectPoints.length === 0) {
+          console.warn('Aucun point pour l\'objet sélectionné')
+          return
+        }
+        
+        // Capturer l'image actuelle de la vidéo
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Utiliser les dimensions réelles de la vidéo
+        canvas.width = this.originalVideoDimensions.width
+        canvas.height = this.originalVideoDimensions.height
+        
+        // Dessiner l'image actuelle sur le canvas
+        ctx.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height)
+        
+        // Convertir le canvas en blob
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.95)
+        })
+        
+        // Préparer les points et les labels pour l'API
+        const pointCoords = objectPoints.map(p => {
+          // Convertir les coordonnées d'affichage en coordonnées réelles
+          const realX = Math.round((p.x - this.position.x) * this.scaleX)
+          const realY = Math.round((p.y - this.position.y) * this.scaleY)
+          return [realX, realY]
+        })
+        
+        const pointLabels = objectPoints.map(p => p.type === 'positive' ? 1 : 0)
+        
+        // Créer un FormData pour l'envoi
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+        formData.append('points', JSON.stringify(pointCoords))
+        formData.append('labels', JSON.stringify(pointLabels))
+        
+        console.log('Envoi de la requête de segmentation avec points:', pointCoords)
+        console.log('Labels:', pointLabels)
+        
+        // Appeler l'API
+        const response = await axios.post(`${this.apiBaseUrl}/segment`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        })
+        
+        console.log('Réponse de segmentation reçue:', response.data)
+        
+        // Stocker le masque dans une nouvelle annotation
+        if (response.data && response.data.masks && response.data.masks.length > 0) {
+          // Prendre le masque avec le meilleur score
+          const bestMaskIndex = response.data.scores.indexOf(Math.max(...response.data.scores))
+          const bestMask = response.data.masks[bestMaskIndex]
+          const bestScore = response.data.scores[bestMaskIndex]
+          
+          // Créer une nouvelle annotation de type "mask"
+          const annotation = {
+            objectId: this.annotationStore.selectedObjectId,
+            type: 'mask',
+            mask: bestMask,
+            maskScore: bestScore,
+            maskImageSize: response.data.image_size,
+            points: objectPoints.map(p => ({
+              x: Math.round((p.x - this.position.x) * this.scaleX),
+              y: Math.round((p.y - this.position.y) * this.scaleY),
+              type: p.type
+            }))
+          }
+          
+          // Ajouter l'annotation au store
+          const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+          
+          console.log(`Masque ajouté à l'annotation ${annotationId} avec un score de ${bestScore}`)
+          
+          // Réinitialiser les points temporaires après validation
+          // Note: Nous ne supprimons pas les points car ils sont maintenant liés à l'annotation
+          this.currentTool = 'arrow'
+        } else {
+          console.warn('Aucun masque n\'a été retourné par l\'API')
+        }
+      } catch (error) {
+        console.error('Erreur lors de la segmentation par points:', error)
+      } finally {
+        this.isProcessingSegmentation = false
+      }
     },
 
     cancelPoints() {
-      this.points = []
+      // Supprimer tous les points de l'objet sélectionné
+      const pointsToRemove = this.points
+        .filter(p => p.objectId === this.annotationStore.selectedObjectId)
+        .map(p => p.id)
+      
+      // Supprimer chaque point du store
+      pointsToRemove.forEach(id => {
+        this.annotationStore.removeAnnotation(this.currentFrameNumber, id)
+      })
+      
+      // Revenir à l'outil de sélection
       this.currentTool = 'arrow'
     },
 
