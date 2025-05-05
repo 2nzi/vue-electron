@@ -886,6 +886,8 @@ export default {
 
     async getSegmentationMask(annotationId, bbox) {
       let notificationId = null;
+      // Stocker l'ID de l'objet actuel au moment de lancer la segmentation
+      const currentObjectId = this.annotationStore.selectedObjectId;
       
       try {
         // Créer une notification pour cette tâche de segmentation
@@ -935,11 +937,12 @@ export default {
           const bestMask = response.data.masks[bestMaskIndex]
           const bestScore = response.data.scores[bestMaskIndex]
           
-          // Mettre à jour l'annotation avec le masque
+          // Mettre à jour l'annotation avec le masque en utilisant l'objectId sauvegardé
           this.annotationStore.updateAnnotation(this.currentFrameNumber, annotationId, {
             mask: bestMask,
             maskScore: bestScore,
-            maskImageSize: response.data.image_size
+            maskImageSize: response.data.image_size,
+            objectId: currentObjectId // Utiliser l'ID d'objet sauvegardé
           })
           
           // Log détaillé du masque
@@ -1161,9 +1164,12 @@ export default {
 
     async validatePoints() {
       if (this.annotationStore.selectedObjectId) {
+        // Stocker l'ID de l'objet actuel au moment de lancer la segmentation
+        const currentObjectId = this.annotationStore.selectedObjectId;
+        
         // Filtrer les points pour l'objet sélectionné uniquement
         const objectPoints = this.points.filter(point => 
-          point.objectId === this.annotationStore.selectedObjectId
+          point.objectId === currentObjectId
         );
         
         if (objectPoints.length > 0) {
@@ -1171,7 +1177,7 @@ export default {
           try {
             notificationId = notificationService.addNotification({
               title: 'Segmentation par points',
-              message: `Traitement avec ${objectPoints.length} points`
+              message: `Traitement avec ${objectPoints.length} points de l'objet ${currentObjectId}`
             });
             
             // Sauvegarder l'outil actuel avant la segmentation
@@ -1230,9 +1236,9 @@ export default {
               const bestMask = response.data.masks[bestMaskIndex]
               const bestScore = response.data.scores[bestMaskIndex]
               
-              // Créer une nouvelle annotation de type "mask"
+              // Créer une nouvelle annotation de type "mask" avec l'objectId sauvegardé
               const annotation = {
-                objectId: this.annotationStore.selectedObjectId,
+                objectId: currentObjectId, // Utiliser l'ID d'objet sauvegardé
                 type: 'mask',
                 mask: bestMask,
                 maskScore: bestScore,
