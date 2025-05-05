@@ -178,10 +178,7 @@
     />
 
     <!-- Indicateur de chargement de segmentation -->
-    <div v-if="isProcessingSegmentation" class="segmentation-loading">
-      <div class="spinner"></div>
-      <span>Segmentation en cours...</span>
-    </div>
+    <segmentation-loading v-if="isProcessingSegmentation" />
   </div>
 </template>
 
@@ -191,13 +188,16 @@ import { useAnnotationStore } from '@/stores/annotationStore'
 import ToolBar from './tools/ToolBar.vue'
 import ValidationTools from './tools/ValidationTools.vue'
 import axios from 'axios'
+import SegmentationLoading from '@/components/common/SegmentationLoading.vue'
+import { notificationService } from '@/services/notificationService'
 
 export default {
   name: 'VideoSection',
 
   components: {
     ToolBar,
-    ValidationTools
+    ValidationTools,
+    SegmentationLoading
   },
 
   props: {
@@ -834,19 +834,32 @@ export default {
       const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
 
       // Appeler l'API pour obtenir le masque de segmentation
-      await this.getSegmentationMask(annotationId, originalRect)
-
-      // Log détaillé
-      console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
-      console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+      this.getSegmentationMask(annotationId, originalRect)
+        .then(result => {
+          if (result.success) {
+            // Log détaillé
+            console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
+            console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+          } else {
+            console.error('Erreur lors de la segmentation:', result.error)
+          }
+        })
 
       this.isDrawing = false
       this.rectangleSize = { width: 0, height: 0 }
     },
 
     async getSegmentationMask(annotationId, bbox) {
+      let notificationId = null;
+      
       try {
-        this.isProcessingSegmentation = true
+        // Créer une notification pour cette tâche de segmentation
+        notificationId = notificationService.addNotification({
+          title: 'Segmentation en cours',
+          message: `Traitement de la région ${bbox.width}x${bbox.height}`
+        });
+        
+        this.isProcessingSegmentation = true;
         
         // Capturer l'image actuelle de la vidéo
         const canvas = document.createElement('canvas')
@@ -906,6 +919,15 @@ export default {
           const updatedAnnotation = this.annotationStore.getAnnotation(this.currentFrameNumber, annotationId)
           console.log('Annotation mise à jour avec masque:', updatedAnnotation)
           
+          // Mettre à jour la notification avec le succès
+          if (notificationId) {
+            notificationService.updateNotification(notificationId, {
+              status: 'success',
+              title: 'Segmentation réussie',
+              message: `Masque généré avec un score de ${bestScore.toFixed(2)}`
+            });
+          }
+          
           return {
             success: true,
             maskScore: bestScore
@@ -918,6 +940,16 @@ export default {
         }
       } catch (error) {
         console.error('Erreur lors de la segmentation:', error)
+        
+        // Mettre à jour la notification avec l'erreur
+        if (notificationId) {
+          notificationService.updateNotification(notificationId, {
+            status: 'error',
+            title: 'Échec de la segmentation',
+            message: error.message || 'Une erreur est survenue'
+          });
+        }
+        
         return {
           success: false,
           error: error.message
@@ -1090,13 +1122,16 @@ export default {
     },
 
     async validatePoints() {
-      if (this.points.length === 0) {
-        console.warn('Aucun point à valider')
-        return
-      }
-
+      let notificationId = null;
+      
       try {
-        this.isProcessingSegmentation = true
+        // Créer une notification
+        notificationId = notificationService.addNotification({
+          title: 'Segmentation par points',
+          message: `Traitement avec ${this.points.length} points`
+        });
+        
+        this.isProcessingSegmentation = true;
         
         // Récupérer tous les points pour l'objet sélectionné
         const objectPoints = this.points.filter(p => p.objectId === this.annotationStore.selectedObjectId)
@@ -1176,6 +1211,15 @@ export default {
           
           console.log(`Masque ajouté à l'annotation ${annotationId} avec un score de ${bestScore}`)
           
+          // Mettre à jour la notification avec le succès
+          if (notificationId) {
+            notificationService.updateNotification(notificationId, {
+              status: 'success',
+              title: 'Segmentation réussie',
+              message: `Masque généré avec un score de ${bestScore.toFixed(2)}`
+            });
+          }
+          
           // Réinitialiser les points temporaires après validation
           // Note: Nous ne supprimons pas les points car ils sont maintenant liés à l'annotation
           this.currentTool = 'arrow'
@@ -1184,6 +1228,15 @@ export default {
         }
       } catch (error) {
         console.error('Erreur lors de la segmentation par points:', error)
+        
+        // Mettre à jour la notification avec l'erreur
+        if (notificationId) {
+          notificationService.updateNotification(notificationId, {
+            status: 'error',
+            title: 'Échec de la segmentation',
+            message: error.message || 'Une erreur est survenue'
+          });
+        }
       } finally {
         this.isProcessingSegmentation = false
       }

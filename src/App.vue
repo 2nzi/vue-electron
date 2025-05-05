@@ -1,12 +1,23 @@
 <template>
   <div id="app">
     <router-view />
+    <segmentation-notifications ref="notifications" />
   </div>
 </template>
 
 <script>
+import SegmentationNotifications from '@/components/common/SegmentationNotifications.vue';
+import { notificationService } from '@/services/notificationService';
+
 export default {
-  name: 'App'
+  name: 'App',
+  components: {
+    SegmentationNotifications,
+  },
+  mounted() {
+    // Enregistrer le composant de notifications dans le service
+    notificationService.setNotificationComponent(this.$refs.notifications);
+  }
 }
 </script>
 
