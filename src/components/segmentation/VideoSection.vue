@@ -389,7 +389,7 @@ export default {
       this.$watch(
         () => videoStore.isPlaying,
         (isPlaying) => {
-          console.log('État de lecture changé dans VideoSection:', isPlaying)
+          // console.log('État de lecture changé dans VideoSection:', isPlaying)
           if (isPlaying) {
             this.playVideo()
           } else {
