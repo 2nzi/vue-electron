@@ -729,9 +729,9 @@ export default {
     },
 
     handleMouseMove() {
-      const stage = this.$refs.stage.getStage()
-      const pointerPos = stage.getPointerPosition()
-      this.mousePosition = pointerPos
+      const stage = this.$refs.stage.getStage();
+      const pointerPos = stage.getPointerPosition();
+      this.mousePosition = pointerPos;
 
       if (this.isDragging && this.selectedId && this.currentTool === 'arrow') {
         const dx = pointerPos.x - this.dragStartPos.x
@@ -753,22 +753,22 @@ export default {
         return
       }
 
-      if (!this.isDrawing || this.currentTool !== 'rectangle') return
+      if (!this.isDrawing || this.currentTool !== 'rectangle') return;
 
       this.rectangleSize = {
         width: pointerPos.x - this.rectangleStart.x,
         height: pointerPos.y - this.rectangleStart.y
-      }
+      };
     },
 
     async handleMouseUp() {
       if (this.resizing) {
-        this.resizing = false
-        return
+        this.resizing = false;
+        return;
       }
 
       if (this.isDragging) {
-        this.isDragging = false
+        this.isDragging = false;
         
         // Mettre à jour la position dans le store après le drag
         if (this.selectedId) {
@@ -802,23 +802,32 @@ export default {
             })
           }
         }
-        return
+        return;
       }
 
-      if (!this.isDrawing || this.currentTool !== 'rectangle') return
+      if (!this.isDrawing || this.currentTool !== 'rectangle') return;
 
+      // Normaliser les coordonnées du rectangle pour s'assurer que x, y est le coin supérieur gauche
+      // et que width, height sont positifs
+      let normalizedRect = this.normalizeRectangle(
+        this.rectangleStart.x,
+        this.rectangleStart.y,
+        this.rectangleSize.width,
+        this.rectangleSize.height
+      );
+      
       const relativeStart = {
-        x: this.rectangleStart.x - this.position.x,
-        y: this.rectangleStart.y - this.position.y
-      }
+        x: normalizedRect.x - this.position.x,
+        y: normalizedRect.y - this.position.y
+      };
 
       // Utiliser les dimensions réelles de la vidéo originale, pas du proxy
       const originalRect = {
         x: Math.round(relativeStart.x * this.scaleX),
         y: Math.round(relativeStart.y * this.scaleY),
-        width: Math.round(this.rectangleSize.width * this.scaleX),
-        height: Math.round(this.rectangleSize.height * this.scaleY)
-      }
+        width: Math.round(normalizedRect.width * this.scaleX),
+        height: Math.round(normalizedRect.height * this.scaleY)
+      };
 
       // Créer l'annotation avec les coordonnées réelles
       const annotation = {
@@ -828,25 +837,51 @@ export default {
         y: originalRect.y,
         width: originalRect.width,
         height: originalRect.height
-      }
+      };
 
       // Ajouter l'annotation au store
-      const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+      const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation);
 
       // Appeler l'API pour obtenir le masque de segmentation
       this.getSegmentationMask(annotationId, originalRect)
         .then(result => {
           if (result.success) {
             // Log détaillé
-            console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation)
-            console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+            console.log('Rectangle ajouté à la frame', this.currentFrameNumber, ':', annotation);
+            console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)));
           } else {
-            console.error('Erreur lors de la segmentation:', result.error)
+            console.error('Erreur lors de la segmentation:', result.error);
           }
-        })
+        });
 
-      this.isDrawing = false
-      this.rectangleSize = { width: 0, height: 0 }
+      this.isDrawing = false;
+      this.rectangleSize = { width: 0, height: 0 };
+    },
+
+    // Ajouter cette nouvelle méthode pour normaliser les coordonnées du rectangle
+    normalizeRectangle(x, y, width, height) {
+      // Si la largeur est négative, ajuster x et width
+      let newX = x;
+      let newWidth = width;
+      if (width < 0) {
+        newX = x + width;
+        newWidth = Math.abs(width);
+      }
+      
+      // Si la hauteur est négative, ajuster y et height
+      let newY = y;
+      let newHeight = height;
+      if (height < 0) {
+        newY = y + height;
+        newHeight = Math.abs(height);
+      }
+      
+      return {
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+      };
     },
 
     async getSegmentationMask(annotationId, bbox) {
