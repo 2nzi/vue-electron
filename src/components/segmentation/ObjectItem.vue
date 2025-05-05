@@ -28,7 +28,7 @@
 <script>
 import { useAnnotationStore } from '@/stores/annotationStore'
 import { useVideoStore } from '@/stores/videoStore'
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 
 export default {
   name: 'ObjectItem',
@@ -46,6 +46,59 @@ export default {
     const annotationStore = useAnnotationStore()
     const videoStore = useVideoStore()
     const timelineRef = ref(null)
+    
+    // Keyboard shortcut handler
+    const handleKeyDown = (event) => {
+      // Add new object when pressing 'N' key
+      if (event.key === 'n' || event.key === 'N') {
+        // Prevent default behavior (like typing 'n' in an input field)
+        event.preventDefault()
+        
+        // Only process the event if this is the first object item
+        // This prevents multiple objects from being created when multiple ObjectItems exist
+        if (props.objectId !== Object.keys(annotationStore.objects)[0]) {
+          return;
+        }
+        
+        // Check available methods and use the correct one
+        if (typeof annotationStore.addObject === 'function') {
+          annotationStore.addObject();
+        } else if (typeof annotationStore.createNewObject === 'function') {
+          annotationStore.createNewObject();
+        } else {
+          // Fallback: Create a new object ID based on the last object ID + 1
+          const objectIds = Object.keys(annotationStore.objects);
+          let lastId = 0;
+          
+          // Find the highest numeric ID
+          objectIds.forEach(id => {
+            // Extract numeric part from objectX format
+            const numericPart = parseInt(id.replace('object', ''));
+            if (!isNaN(numericPart) && numericPart > lastId) {
+              lastId = numericPart;
+            }
+          });
+          
+          // Create new object with ID = last ID + 1
+          const newObjectId = `object${lastId + 1}`;
+          annotationStore.objects[newObjectId] = {
+            id: newObjectId,
+            color: annotationStore.getNextColor(),
+            // Add any other required properties
+          };
+          console.log(`Created new object: ${newObjectId}`);
+        }
+      }
+    }
+    
+    // Add and remove event listeners
+    onMounted(() => {
+      window.addEventListener('keydown', handleKeyDown)
+    })
+    
+    onUnmounted(() => {
+      window.removeEventListener('keydown', handleKeyDown)
+    })
     
     // Vérifier si cet objet est actuellement sélectionné
     const isSelected = computed(() => {

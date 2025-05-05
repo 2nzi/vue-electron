@@ -70,7 +70,7 @@ export const useAnnotationStore = defineStore('annotations', {
     
     // Ajouter un nouvel objet
     addObject(objectData = {}) {
-      const objectId = `Id-${this.objectIdCounter++}`
+      const objectId = `${this.objectIdCounter++}`
       
       this.objects[objectId] = {
         id: objectId,
