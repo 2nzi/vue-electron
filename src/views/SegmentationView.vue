@@ -119,10 +119,6 @@ export default {
   transition: margin-left 0.3s ease;
 }
 
-.main-content-expanded {
-  margin-left: 20px; /* Pour compenser le bouton */
-}
-
 /* Modifier la position du bouton quand la sidebar est repliée */
 .sidebar-collapsed ~ .toggle-sidebar {
   left: 0;
