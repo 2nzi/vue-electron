@@ -176,9 +176,6 @@
       @validate="validatePoints"
       @cancel="cancelPoints"
     />
-
-    <!-- Indicateur de chargement de segmentation -->
-    <segmentation-loading v-if="isProcessingSegmentation" />
   </div>
 </template>
 
@@ -188,7 +185,6 @@ import { useAnnotationStore } from '@/stores/annotationStore'
 import ToolBar from './tools/ToolBar.vue'
 import ValidationTools from './tools/ValidationTools.vue'
 import axios from 'axios'
-import SegmentationLoading from '@/components/common/SegmentationLoading.vue'
 import { notificationService } from '@/services/notificationService'
 
 export default {
@@ -196,8 +192,7 @@ export default {
 
   components: {
     ToolBar,
-    ValidationTools,
-    SegmentationLoading
+    ValidationTools
   },
 
   props: {
@@ -1636,20 +1631,6 @@ export default {
 
 .pulse-animation {
   animation: pulse 1.5s infinite ease-in-out;
-}
-
-.segmentation-loading {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  background-color: rgba(0, 0, 0, 0.7);
-  color: white;
-  padding: 10px 15px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  z-index: 1000;
 }
 
 .spinner {
