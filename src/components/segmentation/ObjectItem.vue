@@ -195,7 +195,7 @@ export default {
   height: 24px;
   margin-bottom: 18px;
   align-items: center;
-  gap: 14px;
+  gap: 6px;
   cursor: pointer;
   transition: background-color 0.2s ease;
   border-radius: 4px;
