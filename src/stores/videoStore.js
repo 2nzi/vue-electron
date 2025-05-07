@@ -5,6 +5,7 @@ export const useVideoStore = defineStore('video', {
     videos: [],
     selectedVideo: null,
     defaultPath: 'C:\\Users\\antoi\\Documents\\Work_Learn\\Stage-Rennes\\RepositoryFootballVision\\SportDETR\\data\\football\\raw',
+    // defaultPath: '\\\\10.35.51.152\\Biomeca\\Projets\\25_EVA2PERF_M2_AntoineVerdon\\RepositoryFootballVision\\SportDETR\\data\\football\\raw',
     currentTime: 0,
     isPlaying: false,
     duration: 0

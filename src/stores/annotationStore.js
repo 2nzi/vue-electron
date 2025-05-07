@@ -40,7 +40,12 @@ export const useAnnotationStore = defineStore('annotations', {
     // Ajouter une annotation pour l'objet sélectionné à la frame actuelle
     addAnnotation(frameNumber, annotation) {
       const id = uuidv4()
-      const newAnnotation = { id, ...annotation }
+      const newAnnotation = { 
+        id, 
+        ...annotation,
+        // Si c'est un masque et qu'il y a une bbox, l'ajouter à l'annotation
+        ...(annotation.type === 'mask' && annotation.bbox ? { bbox: annotation.bbox } : {})
+      }
       
       if (!this.frameAnnotations[frameNumber]) {
         this.frameAnnotations[frameNumber] = []
