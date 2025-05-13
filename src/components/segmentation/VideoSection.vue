@@ -308,28 +308,34 @@ export default {
         })
     },
     points() {
+      // Combiner les points des annotations existantes et les points temporaires
       const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || []
       
-      // Convertir les annotations en points pour l'affichage
-      return frameAnnotations
-        .filter(annotation => annotation.type === 'point')
-        .map(annotation => {
-          const object = this.annotationStore.objects[annotation.objectId]
-          const color = object ? object.color : (annotation.pointType === 'positive' ? '#4CAF50' : '#f44336')
-          
-          // Convertir les coordonnées originales en coordonnées d'affichage
-          const displayX = this.position.x + (annotation.x / this.scaleX)
-          const displayY = this.position.y + (annotation.y / this.scaleY)
-          
-          return {
-            id: annotation.id,
-            objectId: annotation.objectId,
-            x: displayX,
-            y: displayY,
-            type: annotation.pointType,
-            color: color
-          }
-        })
+      // Points des annotations de type "mask" qui contiennent des points
+      const annotationPoints = frameAnnotations
+        .filter(annotation => annotation.type === 'mask' && annotation.points)
+        .flatMap(annotation => annotation.points.map(point => ({
+          id: `${annotation.id}-point-${point.x}-${point.y}`,
+          objectId: annotation.objectId,
+          x: this.position.x + (point.x / this.scaleX),
+          y: this.position.y + (point.y / this.scaleY),
+          type: point.type,
+          color: this.getObjectColor(annotation.objectId),
+          fromAnnotation: annotation.id
+        })))
+      
+      // Points temporaires
+      const tempPoints = this.annotationStore.temporaryPoints.map(point => ({
+        id: `temp-point-${point.id}`,
+        objectId: point.objectId,
+        x: this.position.x + (point.x / this.scaleX),
+        y: this.position.y + (point.y / this.scaleY),
+        type: point.pointType,
+        color: this.getObjectColor(point.objectId),
+        isTemporary: true
+      }))
+      
+      return [...annotationPoints, ...tempPoints]
     },
     scaleX() {
       if (this.originalVideoDimensions.width && this.imageWidth) {
@@ -1011,24 +1017,19 @@ export default {
       const imageX = Math.round(relativeX * this.scaleX)
       const imageY = Math.round(relativeY * this.scaleY)
       
-      // Créer l'annotation avec les coordonnées réelles
-      const annotation = {
+      // Au lieu de créer une annotation de point, ajouter le point à une collection temporaire
+      this.annotationStore.addTemporaryPoint({
         objectId: this.annotationStore.selectedObjectId,
-        type: 'point',
         x: imageX,
         y: imageY,
         pointType: type
-      }
-      
-      // Ajouter l'annotation au store
-      this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+      })
       
       // Log détaillé
-      console.log('Point ajouté à la frame', this.currentFrameNumber, ':', annotation)
-      console.log('État actuel des annotations:', JSON.parse(JSON.stringify(this.annotationStore.frameAnnotations)))
+      console.log('Point temporaire ajouté:', { x: imageX, y: imageY, type })
       
-      // Lancer automatiquement la segmentation après l'ajout d'un point
-      this.validatePoints()
+      // Ne pas lancer automatiquement la segmentation après chaque point
+      // this.validatePoints()
     },
 
     handleKeyDown(e) {
@@ -1159,20 +1160,15 @@ export default {
 
     async validatePoints() {
       if (this.annotationStore.selectedObjectId) {
-        // Stocker l'ID de l'objet actuel au moment de lancer la segmentation
-        const currentObjectId = this.annotationStore.selectedObjectId;
+        // Récupérer les points temporaires pour l'objet sélectionné
+        const tempPoints = this.annotationStore.getTemporaryPointsForObject(this.annotationStore.selectedObjectId)
         
-        // Filtrer les points pour l'objet sélectionné uniquement
-        const objectPoints = this.points.filter(point => 
-          point.objectId === currentObjectId
-        );
-        
-        if (objectPoints.length > 0) {
+        if (tempPoints.length > 0) {
           let notificationId;
           try {
             notificationId = notificationService.addNotification({
               title: 'Segmentation par points',
-              message: `Traitement avec ${objectPoints.length} points de l'objet ${currentObjectId}`
+              message: `Traitement avec ${tempPoints.length} points`
             });
             
             // Sauvegarder l'outil actuel avant la segmentation
@@ -1197,14 +1193,8 @@ export default {
             })
             
             // Préparer les points et les labels pour l'API
-            const pointCoords = objectPoints.map(p => {
-              // Convertir les coordonnées d'affichage en coordonnées réelles
-              const realX = Math.round((p.x - this.position.x) * this.scaleX)
-              const realY = Math.round((p.y - this.position.y) * this.scaleY)
-              return [realX, realY]
-            })
-            
-            const pointLabels = objectPoints.map(p => p.type === 'positive' ? 1 : 0)
+            const pointCoords = tempPoints.map(p => [p.x, p.y])
+            const pointLabels = tempPoints.map(p => p.pointType === 'positive' ? 1 : 0)
             
             // Créer un FormData pour l'envoi
             const formData = new FormData()
@@ -1231,22 +1221,25 @@ export default {
               const bestMask = response.data.masks[bestMaskIndex]
               const bestScore = response.data.scores[bestMaskIndex]
               
-              // Créer une nouvelle annotation de type "mask" avec l'objectId sauvegardé
+              // Créer une nouvelle annotation de type "mask" avec les points inclus
               const annotation = {
-                objectId: currentObjectId, // Utiliser l'ID d'objet sauvegardé
+                objectId: this.annotationStore.selectedObjectId,
                 type: 'mask',
                 mask: bestMask,
                 maskScore: bestScore,
                 maskImageSize: response.data.image_size,
-                points: objectPoints.map(p => ({
-                  x: Math.round((p.x - this.position.x) * this.scaleX),
-                  y: Math.round((p.y - this.position.y) * this.scaleY),
-                  type: p.type
+                points: tempPoints.map(p => ({
+                  x: p.x,
+                  y: p.y,
+                  type: p.pointType
                 }))
               }
               
               // Ajouter l'annotation au store
               const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
+              
+              // Effacer les points temporaires
+              this.annotationStore.clearTemporaryPoints()
               
               console.log(`Masque ajouté à l'annotation ${annotationId} avec un score de ${bestScore}`)
               
@@ -1285,15 +1278,8 @@ export default {
     },
 
     cancelPoints() {
-      // Supprimer tous les points de l'objet sélectionné
-      const pointsToRemove = this.points
-        .filter(p => p.objectId === this.annotationStore.selectedObjectId)
-        .map(p => p.id)
-      
-      // Supprimer chaque point du store
-      pointsToRemove.forEach(id => {
-        this.annotationStore.removeAnnotation(this.currentFrameNumber, id)
-      })
+      // Au lieu de supprimer des annotations, effacer simplement les points temporaires
+      this.annotationStore.clearTemporaryPoints()
       
       // Revenir à l'outil de sélection
       this.currentTool = 'arrow'

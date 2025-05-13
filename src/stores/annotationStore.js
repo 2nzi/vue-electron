@@ -22,8 +22,15 @@ export const useAnnotationStore = defineStore('annotations', {
     
     // Annotations par frame
     frameAnnotations: {}, // { frameNumber: [{ id, objectId, type, x, y, width, height, mask, maskScore, maskImageSize }] }
-    selectedObjectId: null
+    selectedObjectId: null,
+    temporaryPoints: [] // Nouvelle propriété pour stocker les points temporaires
   }),
+  
+  getters: {
+    getTemporaryPointsForObject: (state) => (objectId) => {
+      return state.temporaryPoints.filter(point => point.objectId === objectId)
+    }
+  },
   
   actions: {
     // Sélectionner un objet
@@ -136,6 +143,27 @@ export const useAnnotationStore = defineStore('annotations', {
       if (!this.frameAnnotations[frameNumber]) return null
       
       return this.frameAnnotations[frameNumber].find(a => a.id === annotationId) || null
+    },
+    
+    addTemporaryPoint(point) {
+      // Ajouter un ID unique au point
+      const pointWithId = {
+        ...point,
+        id: uuidv4()
+      }
+      this.temporaryPoints.push(pointWithId)
+      return pointWithId.id
+    },
+    
+    removeTemporaryPoint(pointId) {
+      const index = this.temporaryPoints.findIndex(p => p.id === pointId)
+      if (index !== -1) {
+        this.temporaryPoints.splice(index, 1)
+      }
+    },
+    
+    clearTemporaryPoints() {
+      this.temporaryPoints = []
     }
   }
 })
