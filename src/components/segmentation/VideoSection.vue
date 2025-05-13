@@ -1033,6 +1033,7 @@ export default {
     },
 
     handleKeyDown(e) {
+      // Raccourci pour supprimer un élément sélectionné
       if (e.key === 'Delete' && this.selectedId) {
         // Déterminer le type d'élément sélectionné
         const selectedRect = this.rectangles.find(r => r.id === this.selectedId);
@@ -1083,7 +1084,27 @@ export default {
         console.log('Element deleted');
       }
       
-      // Ajouter la navigation frame par frame avec les flèches
+      // Raccourci pour valider les points et lancer la segmentation (touche v)
+      if (e.key === 'v' || e.key === 'V') {
+        // Vérifier s'il y a des points temporaires à valider
+        const tempPoints = this.annotationStore.getTemporaryPointsForObject(this.annotationStore.selectedObjectId);
+        if (tempPoints && tempPoints.length > 0) {
+          e.preventDefault(); // Empêcher le comportement par défaut de la touche
+          console.log('Validation des points par raccourci clavier (v)');
+          this.validatePoints();
+        }
+      }
+      
+      // Raccourci pour annuler les points (touche Escape)
+      if (e.key === 'Escape') {
+        const tempPoints = this.annotationStore.getTemporaryPointsForObject(this.annotationStore.selectedObjectId);
+        if (tempPoints && tempPoints.length > 0) {
+          console.log('Annulation des points par raccourci clavier (Escape)');
+          this.cancelPoints();
+        }
+      }
+      
+      // Navigation frame par frame avec les flèches
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault() // Empêcher le défilement de la page
         
