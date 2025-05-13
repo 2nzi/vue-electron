@@ -111,6 +111,24 @@ export const useAnnotationStore = defineStore('annotations', {
       }
     },
     
+    // Nouvelle méthode pour supprimer tous les masques d'un objet sur une frame
+    removeMasksForObject(frameNumber, objectId) {
+      const frameKey = frameNumber.toString()
+      if (this.frameAnnotations[frameKey]) {
+        this.frameAnnotations[frameKey] = this.frameAnnotations[frameKey]
+          .filter(a => !(a.objectId === objectId && a.type === 'mask'))
+      }
+    },
+    
+    // Vérifier si un objet a encore des annotations sur une frame
+    hasAnnotationsForObject(frameNumber, objectId) {
+      const frameKey = frameNumber.toString()
+      if (!this.frameAnnotations[frameKey]) return false
+      
+      return this.frameAnnotations[frameKey]
+        .some(a => a.objectId === objectId)
+    },
+    
     // Générer une couleur aléatoire
     getRandomColor() {
       return '#' + Math.floor(Math.random()*16777215).toString(16).padStart(6, '0')

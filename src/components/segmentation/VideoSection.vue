@@ -1034,9 +1034,53 @@ export default {
 
     handleKeyDown(e) {
       if (e.key === 'Delete' && this.selectedId) {
-        this.annotationStore.removeAnnotation(this.currentFrameNumber, this.selectedId)
-        this.selectedId = null
-        console.log('Element deleted')
+        // Déterminer le type d'élément sélectionné
+        const selectedRect = this.rectangles.find(r => r.id === this.selectedId);
+        const selectedPoint = this.points.find(p => p.id === this.selectedId);
+        
+        if (selectedRect) {
+          // Supprimer le rectangle
+          this.annotationStore.removeAnnotation(this.currentFrameNumber, this.selectedId);
+          
+          // Vérifier s'il reste des annotations pour cet objet sur cette frame
+          this.checkAndCleanupMasks(selectedRect.objectId);
+        } 
+        else if (selectedPoint) {
+          if (selectedPoint.isTemporary) {
+            // Supprimer un point temporaire
+            this.annotationStore.removeTemporaryPoint(selectedPoint.id.replace('temp-point-', ''));
+          } else {
+            // Supprimer un point d'une annotation existante
+            const annotationId = selectedPoint.fromAnnotation;
+            const annotation = this.annotationStore.getAnnotation(this.currentFrameNumber, annotationId);
+            
+            if (annotation && annotation.points) {
+              // Filtrer les points pour retirer celui qui est sélectionné
+              const pointKey = selectedPoint.id.split('-point-')[1]; // Récupérer les coordonnées du point
+              const [pointX, pointY] = pointKey.split('-').map(Number);
+              
+              const updatedPoints = annotation.points.filter(p => 
+                !(p.x === pointX && p.y === pointY)
+              );
+              
+              if (updatedPoints.length > 0) {
+                // Mettre à jour l'annotation avec les points restants
+                this.annotationStore.updateAnnotation(this.currentFrameNumber, annotationId, {
+                  points: updatedPoints
+                });
+              } else {
+                // Si plus aucun point, supprimer l'annotation complète
+                this.annotationStore.removeAnnotation(this.currentFrameNumber, annotationId);
+              }
+              
+              // Vérifier s'il reste des annotations pour cet objet sur cette frame
+              this.checkAndCleanupMasks(selectedPoint.objectId);
+            }
+          }
+        }
+        
+        this.selectedId = null;
+        console.log('Element deleted');
       }
       
       // Ajouter la navigation frame par frame avec les flèches
@@ -1058,6 +1102,37 @@ export default {
         }
         
         // console.log(`Navigation: Frame ${currentFrame} -> ${newFrame}, Temps: ${newTime.toFixed(3)}s`)
+      }
+    },
+
+    // Nouvelle méthode pour vérifier et nettoyer les masques orphelins
+    checkAndCleanupMasks(objectId) {
+      const frameAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber) || [];
+      
+      // Vérifier s'il reste des annotations (rectangles ou points) pour cet objet sur cette frame
+      const hasRemainingElements = frameAnnotations.some(annotation => 
+        annotation.objectId === objectId && 
+        (annotation.type === 'rectangle' || 
+         (annotation.type === 'mask' && annotation.points && annotation.points.length > 0))
+      );
+      
+      if (!hasRemainingElements) {
+        // Si aucun élément ne reste, supprimer tous les masques associés à cet objet sur cette frame
+        const masksToRemove = frameAnnotations
+          .filter(annotation => 
+            annotation.objectId === objectId && 
+            annotation.type === 'mask' && 
+            (!annotation.points || annotation.points.length === 0)
+          )
+          .map(annotation => annotation.id);
+        
+        masksToRemove.forEach(maskId => {
+          this.annotationStore.removeAnnotation(this.currentFrameNumber, maskId);
+        });
+        
+        if (masksToRemove.length > 0) {
+          console.log(`Suppression de ${masksToRemove.length} masques orphelins pour l'objet ${objectId}`);
+        }
       }
     },
 
@@ -1351,16 +1426,16 @@ export default {
       return object ? object.color : '#CCCCCC';
     },
     
-    handleMaskClick(id) {
-      this.selectedId = id;
-      
-      // Trouver l'annotation correspondante
-      const annotation = this.annotationStore.getAnnotation(this.currentFrameNumber, id);
-      
-      if (annotation) {
-        // Sélectionner l'objet correspondant
-        this.annotationStore.selectObject(annotation.objectId);
+    handleMaskClick(maskId, e) {
+      // Empêcher la propagation pour éviter que handleMouseDown ne soit aussi appelé
+      if (e && e.evt) {
+        e.evt.stopPropagation(); // Remplacer cancelBubble par stopPropagation
       }
+      
+      // Sélectionner le masque
+      this.selectedId = maskId;
+      
+      console.log('Selected mask:', maskId);
     },
     
     drawMask(context, shape, annotation) {
@@ -1487,6 +1562,24 @@ export default {
       
       // Indiquer à Konva que le dessin est terminé
       shape.strokeEnabled(false); // Désactiver le contour automatique
+    },
+
+    handleShapeMouseDown(e, shapeId) {
+      // Empêcher la propagation pour éviter que handleMouseDown ne soit aussi appelé
+      e.evt.stopPropagation(); // Remplacer cancelBubble par stopPropagation
+      
+      // Sélectionner la forme
+      this.selectedId = shapeId;
+      
+      // Si l'outil actuel est la flèche, activer le mode de déplacement
+      if (this.currentTool === 'arrow') {
+        this.isDragging = true;
+        
+        const stage = this.$refs.stage.getStage();
+        this.dragStartPos = stage.getPointerPosition();
+        
+        console.log('Selected shape:', shapeId);
+      }
     },
   },
 
