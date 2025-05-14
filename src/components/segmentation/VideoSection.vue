@@ -239,7 +239,7 @@ export default {
       isProcessingSegmentation: false,
       maskCache: {},
     }
-  },
+  }, 
 
   mounted() {
     // Réactiver l'élément vidéo
@@ -272,7 +272,7 @@ export default {
 
   computed: {
     isPointingMode() {
-      return this.currentTool === 'positive' || this.currentTool === 'negative'
+      return this.currentTool === 'positive' || this.currentTool === 'negative' || this.currentTool === 'arrow';
     },
     availableObjects() {
       return Object.values(this.annotationStore.objects)
@@ -1255,120 +1255,207 @@ export default {
     },
 
     async validatePoints() {
-      if (this.annotationStore.selectedObjectId) {
-        // Récupérer les points temporaires pour l'objet sélectionné
-        const tempPoints = this.annotationStore.getTemporaryPointsForObject(this.annotationStore.selectedObjectId)
+      // Vérifier si un objet est sélectionné
+      if (!this.annotationStore.selectedObjectId) {
+        console.warn("Aucun objet sélectionné pour la validation des points");
+        return;
+      }
+      
+      let notificationId;
+      try {
+        // Récupérer tous les points temporaires pour l'objet sélectionné
+        const tempPoints = this.annotationStore.getTemporaryPointsForObject(this.annotationStore.selectedObjectId);
         
-        if (tempPoints.length > 0) {
-          let notificationId;
-          try {
-            notificationId = notificationService.addNotification({
-              title: 'Segmentation par points',
-              message: `Traitement avec ${tempPoints.length} points`
-            });
-            
-            // Sauvegarder l'outil actuel avant la segmentation
-            const currentTool = this.currentTool;
-            
-            this.isProcessingSegmentation = true;
-            
-            // Capturer l'image actuelle de la vidéo
-            const canvas = document.createElement('canvas')
-            const ctx = canvas.getContext('2d')
-            
-            // Utiliser les dimensions réelles de la vidéo
-            canvas.width = this.originalVideoDimensions.width
-            canvas.height = this.originalVideoDimensions.height
-            
-            // Dessiner l'image actuelle sur le canvas
-            ctx.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height)
-            
-            // Convertir le canvas en blob
-            const blob = await new Promise(resolve => {
-              canvas.toBlob(resolve, 'image/jpeg', 0.95)
-            })
-            
-            // Préparer les points et les labels pour l'API
-            const pointCoords = tempPoints.map(p => [p.x, p.y])
-            const pointLabels = tempPoints.map(p => p.pointType === 'positive' ? 1 : 0)
-            
-            // Créer un FormData pour l'envoi
-            const formData = new FormData()
-            formData.append('file', blob, 'frame.jpg')
-            formData.append('points', JSON.stringify(pointCoords))
-            formData.append('labels', JSON.stringify(pointLabels))
-            
-            console.log('Envoi de la requête de segmentation avec points:', pointCoords)
-            console.log('Labels:', pointLabels)
-            
-            // Appeler l'API
-            const response = await axios.post(`${this.apiBaseUrl}/segment`, formData, {
-              headers: {
-                'Content-Type': 'multipart/form-data'
-              }
-            })
-            
-            console.log('Réponse de segmentation reçue:', response.data)
-            
-            // Stocker le masque dans une nouvelle annotation
-            if (response.data && response.data.masks && response.data.masks.length > 0) {
-              // Prendre le masque avec le meilleur score
-              const bestMaskIndex = response.data.scores.indexOf(Math.max(...response.data.scores))
-              const bestMask = response.data.masks[bestMaskIndex]
-              const bestScore = response.data.scores[bestMaskIndex]
+        notificationId = notificationService.addNotification({
+          title: 'Segmentation par points',
+          message: `Préparation de la segmentation...`
+        });
+        
+        // Sauvegarder l'outil actuel avant la segmentation
+        const currentTool = this.currentTool;
+        
+        this.isProcessingSegmentation = true;
+        
+        // Vérifier si un masque existe déjà pour cet objet sur cette frame
+        const existingMasks = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber)
+          .filter(annotation => 
+            annotation.objectId === this.annotationStore.selectedObjectId && 
+            annotation.type === 'mask'
+          );
+        
+        // Récupérer tous les points existants pour cet objet
+        let allPoints = [];
+        
+        // Ajouter les points des masques existants s'il y en a
+        if (existingMasks.length > 0) {
+          existingMasks.forEach(mask => {
+            if (mask.points && mask.points.length > 0) {
+              // Convertir les points du masque au format des points temporaires
+              const maskPoints = mask.points.map(p => ({
+                objectId: mask.objectId,
+                x: p.x,
+                y: p.y,
+                pointType: p.type
+              }));
               
-              // Créer une nouvelle annotation de type "mask" avec les points inclus
-              const annotation = {
-                objectId: this.annotationStore.selectedObjectId,
-                type: 'mask',
-                mask: bestMask,
-                maskScore: bestScore,
-                maskImageSize: response.data.image_size,
-                points: tempPoints.map(p => ({
-                  x: p.x,
-                  y: p.y,
-                  type: p.pointType
-                }))
-              }
-              
-              // Ajouter l'annotation au store
-              const annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation)
-              
-              // Effacer les points temporaires
-              this.annotationStore.clearTemporaryPoints()
-              
-              console.log(`Masque ajouté à l'annotation ${annotationId} avec un score de ${bestScore}`)
-              
-              // Mettre à jour la notification avec le succès
-              if (notificationId) {
-                notificationService.updateNotification(notificationId, {
-                  status: 'success',
-                  title: 'Segmentation réussie',
-                  message: `Masque généré avec un score de ${bestScore.toFixed(2)}`
-                });
-              }
-            } else {
-              console.warn('Aucun masque n\'a été retourné par l\'API')
-            }
-            
-            // Une fois la segmentation terminée, restaurer l'outil précédemment sélectionné
-            this.currentTool = currentTool;
-            
-            notificationService.removeNotification(notificationId);
-          } catch (error) {
-            console.error('Erreur lors de la segmentation par points:', error)
-            
-            // Mettre à jour la notification avec l'erreur
-            if (notificationId) {
-              notificationService.updateNotification(notificationId, {
-                status: 'error',
-                title: 'Échec de la segmentation',
-                message: error.message || 'Une erreur est survenue'
+              // Ajouter uniquement les points qui ne sont pas déjà dans allPoints
+              maskPoints.forEach(maskPoint => {
+                const isDuplicate = allPoints.some(p => 
+                  p.x === maskPoint.x && p.y === maskPoint.y && p.pointType === maskPoint.pointType
+                );
+                
+                if (!isDuplicate) {
+                  allPoints.push(maskPoint);
+                }
               });
             }
-          } finally {
-            this.isProcessingSegmentation = false
+          });
+        }
+        
+        // Ajouter les points temporaires s'il y en a
+        if (tempPoints && tempPoints.length > 0) {
+          tempPoints.forEach(tempPoint => {
+            const isDuplicate = allPoints.some(p => 
+              p.x === tempPoint.x && p.y === tempPoint.y && p.pointType === tempPoint.pointType
+            );
+            
+            if (!isDuplicate) {
+              allPoints.push(tempPoint);
+            }
+          });
+        }
+        
+        // Si aucun point n'est disponible, afficher un message et sortir
+        if (allPoints.length === 0) {
+          notificationService.updateNotification(notificationId, {
+            status: 'warning',
+            title: 'Segmentation impossible',
+            message: 'Aucun point disponible pour la segmentation'
+          });
+          return;
+        }
+        
+        // Mettre à jour la notification
+        notificationService.updateNotification(notificationId, {
+          message: `Traitement avec ${allPoints.length} points`
+        });
+        
+        // Capturer l'image actuelle de la vidéo
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Utiliser les dimensions réelles de la vidéo
+        canvas.width = this.originalVideoDimensions.width
+        canvas.height = this.originalVideoDimensions.height
+        
+        // Dessiner l'image actuelle sur le canvas
+        ctx.drawImage(this.videoElement, 0, 0, canvas.width, canvas.height)
+        
+        // Convertir le canvas en blob
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/jpeg', 0.95)
+        })
+        
+        // Préparer les points et les labels pour l'API
+        const pointCoords = allPoints.map(p => [p.x, p.y])
+        const pointLabels = allPoints.map(p => p.pointType === 'positive' ? 1 : 0)
+        
+        // Créer un FormData pour l'envoi
+        const formData = new FormData()
+        formData.append('file', blob, 'frame.jpg')
+        formData.append('points', JSON.stringify(pointCoords))
+        formData.append('labels', JSON.stringify(pointLabels))
+        
+        console.log('Envoi de la requête de segmentation avec points:', pointCoords)
+        console.log('Labels:', pointLabels)
+        
+        // Appeler l'API
+        const response = await axios.post(`${this.apiBaseUrl}/segment`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
           }
+        })
+        
+        console.log('Réponse de segmentation reçue:', response.data)
+        
+        // Stocker le masque dans une nouvelle annotation ou mettre à jour l'existante
+        if (response.data && response.data.masks && response.data.masks.length > 0) {
+          // Prendre le masque avec le meilleur score
+          const bestMaskIndex = response.data.scores.indexOf(Math.max(...response.data.scores))
+          const bestMask = response.data.masks[bestMaskIndex]
+          const bestScore = response.data.scores[bestMaskIndex]
+          
+          // Créer une nouvelle annotation de type "mask" avec tous les points
+          const annotation = {
+            objectId: this.annotationStore.selectedObjectId,
+            type: 'mask',
+            mask: bestMask,
+            maskScore: bestScore,
+            maskImageSize: response.data.image_size,
+            points: allPoints.map(p => ({
+              x: p.x,
+              y: p.y,
+              type: p.pointType
+            }))
+          }
+          
+          // Si un masque existe déjà, le mettre à jour, sinon en créer un nouveau
+          let annotationId;
+          if (existingMasks.length > 0) {
+            // Supprimer tous les masques existants pour cet objet
+            existingMasks.forEach(mask => {
+              this.annotationStore.removeAnnotation(this.currentFrameNumber, mask.id);
+            });
+            
+            // Créer un nouveau masque avec tous les points
+            annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation);
+            console.log(`Masque existant remplacé par un nouveau masque ${annotationId} avec un score de ${bestScore}`);
+          } else {
+            // Ajouter une nouvelle annotation
+            annotationId = this.annotationStore.addAnnotation(this.currentFrameNumber, annotation);
+            console.log(`Nouveau masque ajouté avec l'ID ${annotationId} et un score de ${bestScore}`);
+          }
+          
+          // Effacer les points temporaires
+          this.annotationStore.clearTemporaryPoints()
+          
+          // Mettre à jour la notification avec le succès
+          notificationService.updateNotification(notificationId, {
+            status: 'success',
+            title: 'Segmentation réussie',
+            message: `Masque généré avec un score de ${bestScore.toFixed(2)}`
+          });
+        } else {
+          console.warn('Aucun masque n\'a été retourné par l\'API')
+          notificationService.updateNotification(notificationId, {
+            status: 'error',
+            title: 'Échec de la segmentation',
+            message: 'Aucun masque n\'a été retourné par l\'API'
+          });
+        }
+        
+        // Une fois la segmentation terminée, restaurer l'outil précédemment sélectionné
+        this.currentTool = currentTool;
+        
+      } catch (error) {
+        console.error('Erreur lors de la segmentation par points:', error)
+        
+        // Mettre à jour la notification avec l'erreur
+        if (notificationId) {
+          notificationService.updateNotification(notificationId, {
+            status: 'error',
+            title: 'Échec de la segmentation',
+            message: error.message || 'Une erreur est survenue'
+          });
+        }
+      } finally {
+        this.isProcessingSegmentation = false
+        
+        // Supprimer la notification après un délai si elle est toujours présente
+        if (notificationId) {
+          setTimeout(() => {
+            notificationService.removeNotification(notificationId);
+          }, 3000);
         }
       }
     },
@@ -1601,6 +1688,30 @@ export default {
         
         console.log('Selected shape:', shapeId);
       }
+    },
+
+    // Ajouter cette méthode pour gérer l'ajout de points à un masque existant
+    addPointToExistingMask(pos, type) {
+      if (!this.annotationStore.selectedObjectId) {
+        this.annotationStore.addObject();
+      }
+      
+      const relativeX = pos.x - this.position.x;
+      const relativeY = pos.y - this.position.y;
+      
+      // Utiliser les dimensions réelles de la vidéo originale
+      const imageX = Math.round(relativeX * this.scaleX);
+      const imageY = Math.round(relativeY * this.scaleY);
+      
+      // Ajouter le point à la collection temporaire
+      this.annotationStore.addTemporaryPoint({
+        objectId: this.annotationStore.selectedObjectId,
+        x: imageX,
+        y: imageY,
+        pointType: type
+      });
+      
+      console.log('Point temporaire ajouté:', { x: imageX, y: imageY, type });
     },
   },
 
