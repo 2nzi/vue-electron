@@ -830,6 +830,18 @@ export default {
         height: Math.round(normalizedRect.height * this.scaleY)
       };
 
+      // Vérifier s'il existe déjà des annotations pour cet objet sur cette frame
+      const existingAnnotations = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber)
+        .filter(annotation => annotation.objectId === this.annotationStore.selectedObjectId);
+      
+      // Si des annotations existent déjà, les supprimer avant d'ajouter la nouvelle
+      if (existingAnnotations.length > 0) {
+        console.log(`Suppression de ${existingAnnotations.length} annotations existantes pour l'objet ${this.annotationStore.selectedObjectId}`);
+        existingAnnotations.forEach(annotation => {
+          this.annotationStore.removeAnnotation(this.currentFrameNumber, annotation.id);
+        });
+      }
+
       // Créer l'annotation avec les coordonnées réelles
       const annotation = {
         objectId: this.annotationStore.selectedObjectId,
@@ -1017,6 +1029,33 @@ export default {
       const imageX = Math.round(relativeX * this.scaleX)
       const imageY = Math.round(relativeY * this.scaleY)
       
+      // Vérifier s'il existe des rectangles pour cet objet sur cette frame
+      const existingRectangles = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber)
+        .filter(annotation => 
+          annotation.objectId === this.annotationStore.selectedObjectId && 
+          annotation.type === 'rectangle'
+        );
+      
+      // Si des rectangles existent, les supprimer avant d'ajouter le point
+      if (existingRectangles.length > 0) {
+        console.log(`Suppression de ${existingRectangles.length} rectangles existants pour l'objet ${this.annotationStore.selectedObjectId}`);
+        existingRectangles.forEach(rectangle => {
+          this.annotationStore.removeAnnotation(this.currentFrameNumber, rectangle.id);
+        });
+        
+        // Supprimer également les masques associés à ces rectangles
+        const associatedMasks = this.annotationStore.getAnnotationsForFrame(this.currentFrameNumber)
+          .filter(annotation => 
+            annotation.objectId === this.annotationStore.selectedObjectId && 
+            annotation.type === 'mask' && 
+            (!annotation.points || annotation.points.length === 0)
+          );
+        
+        associatedMasks.forEach(mask => {
+          this.annotationStore.removeAnnotation(this.currentFrameNumber, mask.id);
+        });
+      }
+      
       // Au lieu de créer une annotation de point, ajouter le point à une collection temporaire
       this.annotationStore.addTemporaryPoint({
         objectId: this.annotationStore.selectedObjectId,
@@ -1027,9 +1066,6 @@ export default {
       
       // Log détaillé
       console.log('Point temporaire ajouté:', { x: imageX, y: imageY, type })
-      
-      // Ne pas lancer automatiquement la segmentation après chaque point
-      // this.validatePoints()
     },
 
     handleKeyDown(e) {
@@ -1279,6 +1315,21 @@ export default {
         const currentTool = this.currentTool;
         
         this.isProcessingSegmentation = true;
+        
+        // Vérifier s'il existe des rectangles pour cet objet sur cette frame
+        const existingRectangles = this.annotationStore.getAnnotationsForFrame(targetFrameNumber)
+          .filter(annotation => 
+            annotation.objectId === targetObjectId && 
+            annotation.type === 'rectangle'
+          );
+        
+        // Si des rectangles existent, les supprimer avant de valider les points
+        if (existingRectangles.length > 0) {
+          console.log(`Suppression de ${existingRectangles.length} rectangles existants pour l'objet ${targetObjectId}`);
+          existingRectangles.forEach(rectangle => {
+            this.annotationStore.removeAnnotation(targetFrameNumber, rectangle.id);
+          });
+        }
         
         // Vérifier si un masque existe déjà pour cet objet sur cette frame
         const existingMasks = this.annotationStore.getAnnotationsForFrame(targetFrameNumber)
